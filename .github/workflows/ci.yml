@@ -1,0 +1,279 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ESLint
+        run: npm run lint
+
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run TypeScript compiler
+        run: npm run typecheck
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests
+        run: npm run test:unit -- --coverage --maxWorkers=2
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: unit
+          name: unit-tests
+      
+      - name: Archive coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage/
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run integration tests
+        run: npm run test:integration -- --maxWorkers=2
+
+  e2e-ios:
+    name: E2E Tests (iOS)
+    runs-on: macos-13
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      
+      - name: Cache Pods
+        uses: actions/cache@v3
+        with:
+          path: ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+      
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+      
+      - name: Install Detox CLI
+        run: npm install -g detox-cli
+      
+      - name: Build app for Detox
+        run: npm run test:e2e:build
+      
+      - name: Run Detox tests
+        run: npm run test:e2e -- --record-logs all
+      
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: detox-artifacts
+          path: |
+            artifacts/
+            e2e/screenshots/
+
+  coverage-check:
+    name: Coverage Threshold Check
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download coverage report
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage/
+      
+      - name: Check coverage thresholds
+        run: |
+          echo "Checking coverage thresholds..."
+          node -e "
+          const coverage = require('./coverage/coverage-summary.json');
+          const global = coverage.total;
+          const services = Object.entries(coverage)
+            .filter(([path]) => path.includes('src/services/'))
+            .reduce((acc, [, data]) => {
+              Object.keys(data).forEach(key => {
+                acc[key] = acc[key] || { total: 0, covered: 0 };
+                acc[key].total += data[key].total;
+                acc[key].covered += data[key].covered;
+              });
+              return acc;
+            }, {});
+          
+          const globalPct = {
+            branches: global.branches.pct,
+            functions: global.functions.pct,
+            lines: global.lines.pct,
+            statements: global.statements.pct,
+          };
+          
+          const servicesPct = Object.entries(services).reduce((acc, [key, val]) => {
+            acc[key] = (val.covered / val.total) * 100;
+            return acc;
+          }, {});
+          
+          console.log('Global Coverage:', globalPct);
+          console.log('Services Coverage:', servicesPct);
+          
+          const failed = [];
+          if (globalPct.branches < 70) failed.push('Global branches < 70%');
+          if (globalPct.functions < 70) failed.push('Global functions < 70%');
+          if (globalPct.lines < 70) failed.push('Global lines < 70%');
+          if (globalPct.statements < 70) failed.push('Global statements < 70%');
+          
+          Object.entries(servicesPct).forEach(([key, val]) => {
+            if (val < 80) failed.push(\`Services \${key} < 80%\`);
+          });
+          
+          if (failed.length > 0) {
+            console.error('Coverage thresholds not met:', failed);
+            process.exit(1);
+          }
+          
+          console.log('✅ All coverage thresholds met!');
+          "
+
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build Android APK
+        run: |
+          cd android
+          ./gradlew assembleRelease
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/release/
+
+  build-ios:
+    name: Build iOS
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+      
+      - name: Build iOS
+        run: |
+          cd ios
+          xcodebuild -workspace RNTestingApp.xcworkspace \
+            -scheme RNTestingApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+  all-checks-pass:
+    name: All Checks Pass
+    needs: [lint, typecheck, unit-tests, integration-tests, coverage-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success
+        run: echo "✅ All checks passed successfully!"
