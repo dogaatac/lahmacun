@@ -211,3 +211,78 @@ export interface TeacherProfile {
   createdAt: number;
   updatedAt: number;
 }
+
+export interface ImportedDocument {
+  id: string;
+  name: string;
+  type: "pdf" | "docx" | "image";
+  uri: string;
+  size: number;
+  pageCount?: number;
+  status: DocumentProcessingStatus;
+  extractedText?: string;
+  chunks?: DocumentChunk[];
+  thumbnailUri?: string;
+  createdAt: number;
+  updatedAt: number;
+  lastAccessedAt: number;
+}
+
+export interface DocumentChunk {
+  id: string;
+  documentId: string;
+  chunkIndex: number;
+  text: string;
+  startPage?: number;
+  endPage?: number;
+  tokenCount?: number;
+}
+
+export type DocumentProcessingStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "paused";
+
+export interface DocumentProcessingProgress {
+  documentId: string;
+  status: DocumentProcessingStatus;
+  progress: number;
+  currentPage?: number;
+  totalPages?: number;
+  error?: string;
+}
+
+export interface DocumentMetadata {
+  title?: string;
+  author?: string;
+  subject?: string;
+  keywords?: string[];
+  creationDate?: Date;
+  modificationDate?: Date;
+}
+
+export interface DocumentSummary {
+  id: string;
+  documentId: string;
+  summary: string;
+  keyPoints: string[];
+  generatedAt: number;
+}
+
+export interface DocumentQuiz {
+  id: string;
+  documentId: string;
+  questions: QuizQuestion[];
+  generatedAt: number;
+}
+
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options?: string[];
+  answer: string;
+  explanation?: string;
+  difficulty?: "easy" | "medium" | "hard";
+}
