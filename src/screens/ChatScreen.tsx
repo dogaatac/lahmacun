@@ -15,10 +15,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ListRenderItem,
+  Alert,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import GeminiService from "../services/GeminiService";
 import AnalyticsService from "../services/AnalyticsService";
+import SubscriptionService from "../services/SubscriptionService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
 
 interface Message {
@@ -30,6 +32,7 @@ interface Message {
 
 export const ChatScreen: React.FC = () => {
   const route = useRoute();
+  const navigation = useNavigation();
   const context = (route.params as any)?.context;
 
   const [messages, setMessages] = useState<Message[]>([
@@ -42,17 +45,45 @@ export const ChatScreen: React.FC = () => {
   ]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [hasProAccess, setHasProAccess] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
+    checkAccess();
     AnalyticsService.trackScreen("Chat", {
       hasContext: !!context,
     });
     PerformanceMonitor.trackMemoryUsage("ChatScreen_mount");
   }, [context]);
 
+  const checkAccess = async () => {
+    const access = await SubscriptionService.hasProAccess();
+    setHasProAccess(access);
+  };
+
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || isLoading) {
+      return;
+    }
+
+    const FREE_MESSAGE_LIMIT = 3;
+    if (!hasProAccess && messageCount >= FREE_MESSAGE_LIMIT) {
+      Alert.alert(
+        "Upgrade to Tutor Pack",
+        "You've reached the free message limit. Upgrade to Tutor Pack for unlimited AI tutor chat.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Upgrade",
+            onPress: () => navigation.navigate("Paywall" as never),
+          },
+        ]
+      );
+      AnalyticsService.track("chat_limit_reached");
       return;
     }
 
@@ -66,9 +97,12 @@ export const ChatScreen: React.FC = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInputText("");
     setIsLoading(true);
+    setMessageCount(prev => prev + 1);
 
     AnalyticsService.track("chat_message_sent", {
       message_length: userMessage.text.length,
+      has_pro_access: hasProAccess,
+      message_count: messageCount + 1,
     });
 
     try {
@@ -103,7 +137,7 @@ export const ChatScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, messages]);
+  }, [inputText, isLoading, messages, hasProAccess, messageCount, navigation]);
 
   useEffect(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
@@ -137,6 +171,16 @@ export const ChatScreen: React.FC = () => {
       keyboardVerticalOffset={100}
       testID="chat-screen"
     >
+      {!hasProAccess && (
+        <View style={styles.limitBanner}>
+          <Text style={styles.limitText}>
+            {messageCount}/3 free messages used
+          </Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Paywall" as never)}>
+            <Text style={styles.upgradeLink}>Upgrade</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <FlatList
         ref={flatListRef}
         data={listData}
@@ -208,6 +252,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
+  },
+  limitBanner: {
+    backgroundColor: "#FFF9E6",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#FFE0B2",
+  },
+  limitText: {
+    fontSize: 14,
+    color: "#F57C00",
+  },
+  upgradeLink: {
+    fontSize: 14,
+    color: "#007AFF",
+    fontWeight: "600",
   },
   messagesContainer: {
     flex: 1,

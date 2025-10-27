@@ -5,10 +5,15 @@ A comprehensive React Native application with full testing coverage including un
 ## Features
 
 - 📸 Math problem capture and AI-powered solution generation
-- 💬 Interactive chat for problem clarification
+- 💬 Interactive chat for problem clarification (with AI tutor)
 - 🎯 Personalized quiz generation
 - 🏆 Gamification with XP, levels, and achievements
-- 💰 Subscription and monetization flows
+- 💰 Apple In-App Purchase subscriptions (StoreKit 2)
+  - Free tier with limited features
+  - Pro Monthly: Unlimited problems and premium features
+  - Tutor Pack: All premium features + unlimited AI tutor chat
+- 🔐 Receipt validation and secure storage
+- 🎁 Restore purchases functionality
 - ♿ Full accessibility support
 - 🌐 Offline functionality
 
@@ -93,13 +98,20 @@ Comprehensive checklist in `QA_CHECKLIST.md` covering:
 │   │   ├── GeminiService.ts
 │   │   ├── StorageService.ts
 │   │   ├── AnalyticsService.ts
-│   │   └── GamificationService.ts
-│   └── screens/            # UI screens
-│       ├── integration/    # Integration tests
-│       ├── OnboardingScreen.tsx
-│       ├── CaptureScreen.tsx
-│       ├── SolutionScreen.tsx
-│       └── ChatScreen.tsx
+│   │   ├── GamificationService.ts
+│   │   ├── IAPService.ts          # In-App Purchase service
+│   │   └── SubscriptionService.ts # Subscription management
+│   ├── screens/            # UI screens
+│   │   ├── integration/    # Integration tests
+│   │   ├── OnboardingScreen.tsx
+│   │   ├── CaptureScreen.tsx
+│   │   ├── SolutionScreen.tsx
+│   │   ├── ChatScreen.tsx
+│   │   └── PaywallScreen.tsx      # Subscription paywall
+│   └── types/              # TypeScript types
+├── docs/                   # Documentation
+│   ├── IAP_IMPLEMENTATION.md      # IAP implementation guide
+│   └── IAP_QA_GUIDE.md           # IAP testing guide
 ├── e2e/                    # End-to-end tests
 │   ├── onboarding.e2e.js
 │   ├── problemSolving.e2e.js
@@ -195,6 +207,35 @@ npm run ios
 # Run on Android
 npm run android
 ```
+
+## In-App Purchases (IAP)
+
+### Testing IAP in Sandbox
+
+1. **Configure Products in App Store Connect**
+   - Product IDs: `com.studymate.pro.monthly`, `com.studymate.tutor.pack`
+   - See `docs/IAP_IMPLEMENTATION.md` for detailed setup
+
+2. **Create Sandbox Tester Account**
+   - App Store Connect → Users and Access → Sandbox Testers
+   - Use unique email NOT associated with real Apple ID
+
+3. **Test Purchase Flow**
+   - Sign out of production Apple ID (Settings → App Store)
+   - Run app from Xcode
+   - Navigate to Profile → Upgrade
+   - Make test purchase with sandbox account
+
+4. **Comprehensive Testing**
+   - See `docs/IAP_QA_GUIDE.md` for 20+ test cases
+   - Includes edge cases, error handling, and grace periods
+
+### IAP Features
+- 3 subscription tiers: Free, Pro Monthly, Tutor Pack
+- Client-side receipt validation
+- Grace period support (16 days)
+- Restore purchases functionality
+- Feature gating (chat limits, premium banners)
 
 ## Environment Variables
 

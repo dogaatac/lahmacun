@@ -31,6 +31,11 @@ const SettingsScreen = lazy(() =>
     default: module.SettingsScreen,
   }))
 );
+const PaywallScreen = lazy(() =>
+  import("./src/screens/PaywallScreen").then((module) => ({
+    default: module.PaywallScreen,
+  }))
+);
 
 const Stack = createStackNavigator();
 
@@ -80,6 +85,11 @@ function App(): JSX.Element {
               name="Settings"
               component={SettingsScreen}
               options={{ title: "Settings" }}
+            />
+            <Stack.Screen
+              name="Paywall"
+              component={PaywallScreen}
+              options={{ title: "Upgrade" }}
             />
           </Stack.Navigator>
         </Suspense>
