@@ -1,17 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import GeminiService from '../services/GeminiService';
-import AnalyticsService from '../services/AnalyticsService';
+  ListRenderItem,
+} from "react-native";
+import { useRoute } from "@react-navigation/native";
+import GeminiService from "../services/GeminiService";
+import AnalyticsService from "../services/AnalyticsService";
+import PerformanceMonitor from "../utils/PerformanceMonitor";
 
 interface Message {
   id: string;
@@ -26,24 +34,27 @@ export const ChatScreen: React.FC = () => {
 
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
-      text: 'Hi! I can help you understand this problem better. What would you like to know?',
+      id: "1",
+      text: "Hi! I can help you understand this problem better. What would you like to know?",
       isUser: false,
       timestamp: Date.now(),
     },
   ]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    AnalyticsService.trackScreen('Chat', {
+    AnalyticsService.trackScreen("Chat", {
       hasContext: !!context,
     });
+    PerformanceMonitor.trackMemoryUsage("ChatScreen_mount");
   }, [context]);
 
-  const handleSend = async () => {
-    if (!inputText.trim() || isLoading) return;
+  const handleSend = useCallback(async () => {
+    if (!inputText.trim() || isLoading) {
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -52,18 +63,18 @@ export const ChatScreen: React.FC = () => {
       timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
+    setMessages((prev) => [...prev, userMessage]);
+    setInputText("");
     setIsLoading(true);
 
-    AnalyticsService.track('chat_message_sent', {
+    AnalyticsService.track("chat_message_sent", {
       message_length: userMessage.text.length,
     });
 
     try {
       const response = await GeminiService.chat(
         userMessage.text,
-        messages.map(m => ({ parts: [{ text: m.text }] }))
+        messages.map((m) => ({ parts: [{ text: m.text }] }))
       );
 
       const botMessage: Message = {
@@ -73,70 +84,73 @@ export const ChatScreen: React.FC = () => {
         timestamp: Date.now(),
       };
 
-      setMessages(prev => [...prev, botMessage]);
-      
-      AnalyticsService.track('chat_response_received', {
+      setMessages((prev) => [...prev, botMessage]);
+
+      AnalyticsService.track("chat_response_received", {
         confidence: response.confidence,
       });
     } catch (error) {
-      AnalyticsService.trackError(error as Error, { screen: 'Chat' });
-      
+      AnalyticsService.trackError(error as Error, { screen: "Chat" });
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: "I'm sorry, I encountered an error. Please try again.",
         isUser: false,
         timestamp: Date.now(),
       };
-      
-      setMessages(prev => [...prev, errorMessage]);
+
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [inputText, isLoading, messages]);
 
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    flatListRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
+
+  const renderMessage: ListRenderItem<Message> = useCallback(
+    ({ item, index }) => <MessageBubble message={item} index={index} />,
+    []
+  );
+
+  const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  const listData = useMemo(() => {
+    return isLoading
+      ? [
+          ...messages,
+          {
+            id: "loading",
+            text: "...",
+            isUser: false,
+            timestamp: Date.now(),
+          },
+        ]
+      : messages;
+  }, [messages, isLoading]);
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={100}
       testID="chat-screen"
     >
-      <ScrollView
-        ref={scrollViewRef}
+      <FlatList
+        ref={flatListRef}
+        data={listData}
+        renderItem={renderMessage}
+        keyExtractor={keyExtractor}
         style={styles.messagesContainer}
         contentContainerStyle={styles.messagesContent}
         testID="messages-scroll"
-      >
-        {messages.map((message, index) => (
-          <View
-            key={message.id}
-            style={[
-              styles.messageBubble,
-              message.isUser ? styles.userBubble : styles.botBubble,
-            ]}
-            testID={`message-${index}`}
-          >
-            <Text
-              style={[
-                styles.messageText,
-                message.isUser ? styles.userText : styles.botText,
-              ]}
-            >
-              {message.text}
-            </Text>
-          </View>
-        ))}
-        
-        {isLoading && (
-          <View style={[styles.messageBubble, styles.botBubble]} testID="typing-indicator">
-            <Text style={styles.botText}>...</Text>
-          </View>
-        )}
-      </ScrollView>
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={20}
+        windowSize={21}
+      />
 
       <View style={styles.inputContainer}>
         <TextInput
@@ -165,10 +179,35 @@ export const ChatScreen: React.FC = () => {
   );
 };
 
+const MessageBubble = React.memo<{ message: Message; index: number }>(
+  ({ message, index }) => {
+    const isTyping = message.id === "loading";
+
+    return (
+      <View
+        style={[
+          styles.messageBubble,
+          message.isUser ? styles.userBubble : styles.botBubble,
+        ]}
+        testID={isTyping ? "typing-indicator" : `message-${index}`}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            message.isUser ? styles.userText : styles.botText,
+          ]}
+        >
+          {message.text}
+        </Text>
+      </View>
+    );
+  }
+);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   messagesContainer: {
     flex: 1,
@@ -178,44 +217,44 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   messageBubble: {
-    maxWidth: '80%',
+    maxWidth: "80%",
     padding: 12,
     borderRadius: 16,
     marginVertical: 4,
   },
   userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
+    alignSelf: "flex-end",
+    backgroundColor: "#007AFF",
     borderBottomRightRadius: 4,
   },
   botBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff',
+    alignSelf: "flex-start",
+    backgroundColor: "#fff",
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
   },
   messageText: {
     fontSize: 16,
     lineHeight: 22,
   },
   userText: {
-    color: '#fff',
+    color: "#fff",
   },
   botText: {
-    color: '#333',
+    color: "#333",
   },
   inputContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: "#e0e0e0",
     gap: 12,
   },
   input: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -223,18 +262,18 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   sendButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderRadius: 20,
     paddingHorizontal: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   sendButtonDisabled: {
     opacity: 0.5,
   },
   sendButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

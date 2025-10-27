@@ -1,29 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import AnalyticsService from '../services/AnalyticsService';
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import AnalyticsService from "../services/AnalyticsService";
+import PerformanceMonitor from "../utils/PerformanceMonitor";
 
 const ONBOARDING_STEPS = [
   {
-    title: 'Solve Math Problems',
-    description: 'Take a photo of any math problem and get instant solutions',
-    icon: '📸',
+    title: "Solve Math Problems",
+    description: "Take a photo of any math problem and get instant solutions",
+    icon: "📸",
   },
   {
-    title: 'Learn Step by Step',
-    description: 'Understand each step of the solution process',
-    icon: '📚',
+    title: "Learn Step by Step",
+    description: "Understand each step of the solution process",
+    icon: "📚",
   },
   {
-    title: 'Practice with Quizzes',
-    description: 'Test your knowledge with personalized quizzes',
-    icon: '🎯',
+    title: "Practice with Quizzes",
+    description: "Test your knowledge with personalized quizzes",
+    icon: "🎯",
   },
 ];
 
@@ -31,24 +32,28 @@ export const OnboardingScreen: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const navigation = useNavigation();
 
-  const handleNext = () => {
+  useEffect(() => {
+    PerformanceMonitor.trackMemoryUsage("OnboardingScreen_mount");
+  }, []);
+
+  const handleComplete = useCallback(() => {
+    AnalyticsService.track("onboarding_completed");
+    navigation.navigate("Home" as never);
+  }, [navigation]);
+
+  const handleNext = useCallback(() => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
-      AnalyticsService.track('onboarding_step', { step: currentStep + 1 });
+      AnalyticsService.track("onboarding_step", { step: currentStep + 1 });
     } else {
       handleComplete();
     }
-  };
+  }, [currentStep, handleComplete]);
 
-  const handleSkip = () => {
-    AnalyticsService.track('onboarding_skipped', { step: currentStep });
+  const handleSkip = useCallback(() => {
+    AnalyticsService.track("onboarding_skipped", { step: currentStep });
     handleComplete();
-  };
-
-  const handleComplete = () => {
-    AnalyticsService.track('onboarding_completed');
-    navigation.navigate('Home' as never);
-  };
+  }, [currentStep, handleComplete]);
 
   const step = ONBOARDING_STEPS[currentStep];
 
@@ -71,10 +76,7 @@ export const OnboardingScreen: React.FC = () => {
           {ONBOARDING_STEPS.map((_, index) => (
             <View
               key={index}
-              style={[
-                styles.dot,
-                index === currentStep && styles.dotActive,
-              ]}
+              style={[styles.dot, index === currentStep && styles.dotActive]}
               testID={`pagination-dot-${index}`}
             />
           ))}
@@ -97,8 +99,8 @@ export const OnboardingScreen: React.FC = () => {
         >
           <Text style={styles.nextText}>
             {currentStep === ONBOARDING_STEPS.length - 1
-              ? 'Get Started'
-              : 'Next'}
+              ? "Get Started"
+              : "Next"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -109,16 +111,16 @@ export const OnboardingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 24,
   },
   stepContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 60,
   },
   icon: {
@@ -127,55 +129,55 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
     marginBottom: 16,
   },
   description: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     lineHeight: 24,
   },
   pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: 8,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ddd',
+    backgroundColor: "#ddd",
   },
   dotActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     width: 24,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     padding: 24,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: "#eee",
   },
   skipButton: {
     padding: 12,
   },
   skipText: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   nextButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   nextText: {
     fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
+    color: "#fff",
+    fontWeight: "600",
   },
 });

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface StorageItem<T> {
   key: string;
@@ -7,7 +7,7 @@ export interface StorageItem<T> {
 }
 
 export class StorageService {
-  private prefix: string = '@rn_testing_app:';
+  private prefix: string = "@rn_testing_app:";
 
   async set<T>(key: string, value: T): Promise<void> {
     try {
@@ -16,24 +16,23 @@ export class StorageService {
         value,
         timestamp: Date.now(),
       };
-      await AsyncStorage.setItem(
-        this.getKey(key),
-        JSON.stringify(item)
-      );
+      await AsyncStorage.setItem(this.getKey(key), JSON.stringify(item));
     } catch (error) {
-      throw new Error(`Storage set failed: ${error.message}`);
+      throw new Error(`Storage set failed: ${(error as Error).message}`);
     }
   }
 
   async get<T>(key: string): Promise<T | null> {
     try {
       const data = await AsyncStorage.getItem(this.getKey(key));
-      if (!data) return null;
+      if (!data) {
+        return null;
+      }
 
       const item: StorageItem<T> = JSON.parse(data);
       return item.value;
     } catch (error) {
-      throw new Error(`Storage get failed: ${error.message}`);
+      throw new Error(`Storage get failed: ${(error as Error).message}`);
     }
   }
 
@@ -41,17 +40,17 @@ export class StorageService {
     try {
       await AsyncStorage.removeItem(this.getKey(key));
     } catch (error) {
-      throw new Error(`Storage remove failed: ${error.message}`);
+      throw new Error(`Storage remove failed: ${(error as Error).message}`);
     }
   }
 
   async clear(): Promise<void> {
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const appKeys = keys.filter(key => key.startsWith(this.prefix));
+      const appKeys = keys.filter((key) => key.startsWith(this.prefix));
       await AsyncStorage.multiRemove(appKeys);
     } catch (error) {
-      throw new Error(`Storage clear failed: ${error.message}`);
+      throw new Error(`Storage clear failed: ${(error as Error).message}`);
     }
   }
 
@@ -59,10 +58,10 @@ export class StorageService {
     try {
       const keys = await AsyncStorage.getAllKeys();
       return keys
-        .filter(key => key.startsWith(this.prefix))
-        .map(key => key.replace(this.prefix, ''));
+        .filter((key) => key.startsWith(this.prefix))
+        .map((key) => key.replace(this.prefix, ""));
     } catch (error) {
-      throw new Error(`Get all keys failed: ${error.message}`);
+      throw new Error(`Get all keys failed: ${(error as Error).message}`);
     }
   }
 
@@ -77,37 +76,43 @@ export class StorageService {
 
   async setMultiple(items: Record<string, any>): Promise<void> {
     try {
-      const pairs: [string, string][] = Object.entries(items).map(([key, value]) => [
-        this.getKey(key),
-        JSON.stringify({
-          key,
-          value,
-          timestamp: Date.now(),
-        }),
-      ]);
+      const pairs: [string, string][] = Object.entries(items).map(
+        ([key, value]) => [
+          this.getKey(key),
+          JSON.stringify({
+            key,
+            value,
+            timestamp: Date.now(),
+          }),
+        ]
+      );
       await AsyncStorage.multiSet(pairs);
     } catch (error) {
-      throw new Error(`Storage setMultiple failed: ${error.message}`);
+      throw new Error(
+        `Storage setMultiple failed: ${(error as Error).message}`
+      );
     }
   }
 
   async getMultiple<T>(keys: string[]): Promise<Record<string, T>> {
     try {
-      const prefixedKeys = keys.map(key => this.getKey(key));
+      const prefixedKeys = keys.map((key) => this.getKey(key));
       const pairs = await AsyncStorage.multiGet(prefixedKeys);
-      
+
       const result: Record<string, T> = {};
       pairs.forEach(([key, value]) => {
         if (value) {
           const item: StorageItem<T> = JSON.parse(value);
-          const originalKey = key.replace(this.prefix, '');
+          const originalKey = key.replace(this.prefix, "");
           result[originalKey] = item.value;
         }
       });
 
       return result;
     } catch (error) {
-      throw new Error(`Storage getMultiple failed: ${error.message}`);
+      throw new Error(
+        `Storage getMultiple failed: ${(error as Error).message}`
+      );
     }
   }
 

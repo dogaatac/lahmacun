@@ -16,6 +16,7 @@
     "test:e2e": "detox test",
     "test:e2e:build": "detox build -c ios.sim.debug",
     "test:e2e:build-release": "detox build -c ios.sim.release",
+    "test:performance": "node scripts/performance-test.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
@@ -29,7 +30,9 @@
     "react-native-safe-area-context": "^4.7.0",
     "react-native-screens": "^3.22.0",
     "@react-native-async-storage/async-storage": "^1.19.0",
-    "axios": "^1.4.0"
+    "axios": "^1.4.0",
+    "react-native-performance": "^5.1.0",
+    "@shopify/flash-list": "^1.6.3"
   },
   "devDependencies": {
     "@babel/core": "^7.22.5",

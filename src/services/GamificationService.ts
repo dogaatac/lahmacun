@@ -1,4 +1,4 @@
-import StorageService from './StorageService';
+import StorageService from "./StorageService";
 
 export interface Achievement {
   id: string;
@@ -19,46 +19,47 @@ export interface UserProgress {
 }
 
 export interface Reward {
-  type: 'xp' | 'achievement' | 'badge';
+  type: "xp" | "achievement" | "badge";
   value: number | string;
   message: string;
 }
 
 const ACHIEVEMENTS: Achievement[] = [
   {
-    id: 'first_problem',
-    name: 'First Steps',
-    description: 'Solve your first problem',
-    icon: '🎯',
+    id: "first_problem",
+    name: "First Steps",
+    description: "Solve your first problem",
+    icon: "🎯",
   },
   {
-    id: 'streak_7',
-    name: 'Week Warrior',
-    description: 'Maintain a 7-day streak',
-    icon: '🔥',
+    id: "streak_7",
+    name: "Week Warrior",
+    description: "Maintain a 7-day streak",
+    icon: "🔥",
   },
   {
-    id: 'quiz_master',
-    name: 'Quiz Master',
-    description: 'Complete 10 quizzes',
-    icon: '🏆',
+    id: "quiz_master",
+    name: "Quiz Master",
+    description: "Complete 10 quizzes",
+    icon: "🏆",
   },
   {
-    id: 'problem_solver_50',
-    name: 'Problem Solver',
-    description: 'Solve 50 problems',
-    icon: '⭐',
+    id: "problem_solver_50",
+    name: "Problem Solver",
+    description: "Solve 50 problems",
+    icon: "⭐",
   },
 ];
 
 export class GamificationService {
-  private readonly STORAGE_KEY_PROGRESS = 'user_progress';
-  private readonly STORAGE_KEY_ACHIEVEMENTS = 'user_achievements';
+  private readonly STORAGE_KEY_PROGRESS = "user_progress";
+  private readonly STORAGE_KEY_ACHIEVEMENTS = "user_achievements";
   private readonly XP_PER_LEVEL = 100;
 
   async getUserProgress(): Promise<UserProgress> {
-    const progress = await StorageService.get<UserProgress>(this.STORAGE_KEY_PROGRESS);
-    
+    const progress = await StorageService.get<UserProgress>(
+      this.STORAGE_KEY_PROGRESS
+
     if (!progress) {
       return this.createDefaultProgress();
     }
@@ -72,7 +73,7 @@ export class GamificationService {
 
     progress.xp += amount;
     rewards.push({
-      type: 'xp',
+      type: "xp",
       value: amount,
       message: `+${amount} XP`,
     });
@@ -82,9 +83,9 @@ export class GamificationService {
       progress.xp -= progress.xpToNextLevel;
       progress.level += 1;
       progress.xpToNextLevel = this.calculateXPForLevel(progress.level + 1);
-      
+
       rewards.push({
-        type: 'xp',
+        type: "xp",
         value: progress.level,
         message: `Level Up! You're now level ${progress.level}`,
       });
@@ -97,17 +98,20 @@ export class GamificationService {
   async recordProblemSolved(): Promise<Reward[]> {
     const progress = await this.getUserProgress();
     progress.totalProblemsolved += 1;
-    
+
     await this.updateStreak();
     await StorageService.set(this.STORAGE_KEY_PROGRESS, progress);
 
     const rewards = await this.addXP(10);
     const achievements = await this.checkAchievements();
-    
+
     return [...rewards, ...achievements];
   }
 
-  async recordQuizCompleted(score: number, totalQuestions: number): Promise<Reward[]> {
+  async recordQuizCompleted(
+    score: number,
+    totalQuestions: number
+  ): Promise<Reward[]> {
     const progress = await this.getUserProgress();
     progress.totalQuizzesCompleted += 1;
 
@@ -122,9 +126,10 @@ export class GamificationService {
   }
 
   async getAchievements(): Promise<Achievement[]> {
-    const unlocked = await StorageService.get<string[]>(this.STORAGE_KEY_ACHIEVEMENTS) || [];
-    
-    return ACHIEVEMENTS.map(achievement => {
+    const unlocked =
+      (await StorageService.get<string[]>(this.STORAGE_KEY_ACHIEVEMENTS)) || [];
+
+    return ACHIEVEMENTS.map((achievement) => {
       const isUnlocked = unlocked.includes(achievement.id);
       return {
         ...achievement,
@@ -135,53 +140,65 @@ export class GamificationService {
 
   async getUnlockedAchievements(): Promise<Achievement[]> {
     const achievements = await this.getAchievements();
-    return achievements.filter(a => a.unlockedAt);
+    return achievements.filter((a) => a.unlockedAt);
   }
 
   private async checkAchievements(): Promise<Reward[]> {
     const progress = await this.getUserProgress();
-    const unlocked = await StorageService.get<string[]>(this.STORAGE_KEY_ACHIEVEMENTS) || [];
+    const unlocked =
+      (await StorageService.get<string[]>(this.STORAGE_KEY_ACHIEVEMENTS)) || [];
     const newUnlocked: Reward[] = [];
 
     // Check first problem
-    if (progress.totalProblemsolved === 1 && !unlocked.includes('first_problem')) {
-      unlocked.push('first_problem');
-      const achievement = ACHIEVEMENTS.find(a => a.id === 'first_problem')!;
+    if (
+      progress.totalProblemsolved === 1 &&
+      !unlocked.includes("first_problem")
+    ) {
+      unlocked.push("first_problem");
+      const achievement = ACHIEVEMENTS.find((a) => a.id === "first_problem")!;
       newUnlocked.push({
-        type: 'achievement',
+        type: "achievement",
         value: achievement.id,
         message: `Achievement Unlocked: ${achievement.name}`,
       });
     }
 
     // Check streak
-    if (progress.streak === 7 && !unlocked.includes('streak_7')) {
-      unlocked.push('streak_7');
-      const achievement = ACHIEVEMENTS.find(a => a.id === 'streak_7')!;
+    if (progress.streak === 7 && !unlocked.includes("streak_7")) {
+      unlocked.push("streak_7");
+      const achievement = ACHIEVEMENTS.find((a) => a.id === "streak_7")!;
       newUnlocked.push({
-        type: 'achievement',
+        type: "achievement",
         value: achievement.id,
         message: `Achievement Unlocked: ${achievement.name}`,
       });
     }
 
     // Check quiz master
-    if (progress.totalQuizzesCompleted === 10 && !unlocked.includes('quiz_master')) {
-      unlocked.push('quiz_master');
-      const achievement = ACHIEVEMENTS.find(a => a.id === 'quiz_master')!;
+    if (
+      progress.totalQuizzesCompleted === 10 &&
+      !unlocked.includes("quiz_master")
+    ) {
+      unlocked.push("quiz_master");
+      const achievement = ACHIEVEMENTS.find((a) => a.id === "quiz_master")!;
       newUnlocked.push({
-        type: 'achievement',
+        type: "achievement",
         value: achievement.id,
         message: `Achievement Unlocked: ${achievement.name}`,
       });
     }
 
     // Check problem solver
-    if (progress.totalProblemsolved === 50 && !unlocked.includes('problem_solver_50')) {
-      unlocked.push('problem_solver_50');
-      const achievement = ACHIEVEMENTS.find(a => a.id === 'problem_solver_50')!;
+    if (
+      progress.totalProblemsolved === 50 &&
+      !unlocked.includes("problem_solver_50")
+    ) {
+      unlocked.push("problem_solver_50");
+      const achievement = ACHIEVEMENTS.find(
+        (a) => a.id === "problem_solver_50"
+      )!;
       newUnlocked.push({
-        type: 'achievement',
+        type: "achievement",
         value: achievement.id,
         message: `Achievement Unlocked: ${achievement.name}`,
       });
@@ -196,14 +213,16 @@ export class GamificationService {
 
   private async updateStreak(): Promise<void> {
     const progress = await this.getUserProgress();
-    const today = new Date().toISOString().split('T')[0];
-    
+    const today = new Date().toISOString().split("T")[0];
+
     if (progress.lastActivityDate === today) {
       return; // Already updated today
     }
 
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+
     if (progress.lastActivityDate === yesterday) {
       progress.streak += 1;
     } else if (progress.lastActivityDate !== today) {
