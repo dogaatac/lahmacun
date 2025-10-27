@@ -15,7 +15,9 @@ import UserService from "../services/UserService";
 import GamificationService from "../services/GamificationService";
 import SubscriptionService from "../services/SubscriptionService";
 import AnalyticsService from "../services/AnalyticsService";
+import TeacherModeService from "../services/TeacherModeService";
 import { UserProfile, MasterySnapshot, UserSubscription, APIKey } from "../types";
+import { TeacherPinModal } from "./TeacherPinModal";
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -28,6 +30,9 @@ export const ProfileScreen: React.FC = () => {
   const [editingSubjects, setEditingSubjects] = useState(false);
   const [goalsInput, setGoalsInput] = useState("");
   const [subjectsInput, setSubjectsInput] = useState("");
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinModalMode, setPinModalMode] = useState<"setup" | "verify">("verify");
+  const [teacherModeActive, setTeacherModeActive] = useState(false);
 
   useEffect(() => {
     loadProfileData();
@@ -36,11 +41,12 @@ export const ProfileScreen: React.FC = () => {
   const loadProfileData = async () => {
     try {
       setLoading(true);
-      const [profileData, progress, subData, keyData] = await Promise.all([
+      const [profileData, progress, subData, keyData, teacherMode] = await Promise.all([
         UserService.getProfile(),
         GamificationService.getUserProgress(),
         SubscriptionService.getSubscription(),
         UserService.getAPIKey(),
+        TeacherModeService.isTeacherModeActive(),
       ]);
 
       if (!profileData) {
@@ -70,6 +76,7 @@ export const ProfileScreen: React.FC = () => {
       setMastery(masteryData);
       setSubscription(subData);
       setApiKey(keyData);
+      setTeacherModeActive(teacherMode);
 
       AnalyticsService.trackScreen("Profile");
     } catch (error) {
@@ -161,6 +168,28 @@ export const ProfileScreen: React.FC = () => {
       );
     }
     AnalyticsService.track("subscription_manage_clicked");
+  };
+
+  const handleTeacherModeToggle = async () => {
+    const hasPin = await TeacherModeService.hasPin();
+    
+    if (!hasPin) {
+      setPinModalMode("setup");
+      setShowPinModal(true);
+    } else {
+      setPinModalMode("verify");
+      setShowPinModal(true);
+    }
+  };
+
+  const handlePinSuccess = async () => {
+    setShowPinModal(false);
+    if (pinModalMode === "setup") {
+      Alert.alert("Success", "Teacher PIN setup complete! You can now enable Teacher Mode.");
+    } else {
+      setTeacherModeActive(true);
+      navigation.navigate("TeacherDashboard" as never);
+    }
   };
 
   if (loading) {
@@ -359,6 +388,29 @@ export const ProfileScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Teacher Mode */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Teacher Mode</Text>
+        <TouchableOpacity
+          style={styles.teacherModeButton}
+          onPress={handleTeacherModeToggle}
+          testID="teacher-mode-toggle-button"
+        >
+          <View style={styles.teacherModeContent}>
+            <Text style={styles.teacherModeIcon}>👨‍🏫</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.teacherModeTitle}>
+                {teacherModeActive ? "Teacher Mode Active" : "Enter Teacher Mode"}
+              </Text>
+              <Text style={styles.teacherModeSubtitle}>
+                Review student sessions and provide feedback
+              </Text>
+            </View>
+            <Text style={styles.teacherModeArrow}>→</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
       {/* Settings Navigation */}
       <TouchableOpacity
         style={styles.settingsButton}
@@ -367,6 +419,13 @@ export const ProfileScreen: React.FC = () => {
       >
         <Text style={styles.settingsButtonText}>⚙️ Settings</Text>
       </TouchableOpacity>
+
+      <TeacherPinModal
+        visible={showPinModal}
+        mode={pinModalMode}
+        onClose={() => setShowPinModal(false)}
+        onSuccess={handlePinSuccess}
+      />
     </ScrollView>
   );
 };
@@ -571,5 +630,34 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#333",
+  },
+  teacherModeButton: {
+    backgroundColor: "#f9f9f9",
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+  },
+  teacherModeContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  teacherModeIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  teacherModeTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
+  teacherModeSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 4,
+  },
+  teacherModeArrow: {
+    fontSize: 24,
+    color: "#007AFF",
   },
 });

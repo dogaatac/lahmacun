@@ -12,12 +12,16 @@ import GeminiService from "../services/GeminiService";
 import AnalyticsService from "../services/AnalyticsService";
 import GamificationService from "../services/GamificationService";
 import SubscriptionService from "../services/SubscriptionService";
+import TeacherModeService from "../services/TeacherModeService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
+import { TeacherPinModal } from "./TeacherPinModal";
 
 export const CaptureScreen: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [hasPremium, setHasPremium] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinModalMode, setPinModalMode] = useState<"setup" | "verify">("verify");
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -82,15 +86,43 @@ export const CaptureScreen: React.FC = () => {
     AnalyticsService.track("retake_photo");
   }, []);
 
+  const handleTeacherModeToggle = async () => {
+    const hasPin = await TeacherModeService.hasPin();
+    
+    if (!hasPin) {
+      setPinModalMode("setup");
+      setShowPinModal(true);
+    } else {
+      setPinModalMode("verify");
+      setShowPinModal(true);
+    }
+  };
+
+  const handlePinSuccess = async () => {
+    setShowPinModal(false);
+    if (pinModalMode === "verify") {
+      navigation.navigate("TeacherDashboard" as never);
+    }
+  };
+
   return (
     <View style={styles.container} testID="capture-screen">
-      <TouchableOpacity
-        style={styles.profileButton}
-        onPress={() => navigation.navigate("Profile" as never)}
-        testID="profile-button"
-      >
-        <Text style={styles.profileButtonText}>👤 Profile</Text>
-      </TouchableOpacity>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.teacherModeQuickButton}
+          onPress={handleTeacherModeToggle}
+          testID="teacher-mode-quick-button"
+        >
+          <Text style={styles.quickButtonText}>👨‍🏫</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.profileButton}
+          onPress={() => navigation.navigate("Profile" as never)}
+          testID="profile-button"
+        >
+          <Text style={styles.profileButtonText}>👤 Profile</Text>
+        </TouchableOpacity>
+      </View>
 
       {!hasPremium && (
         <TouchableOpacity
@@ -157,6 +189,13 @@ export const CaptureScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+      <TeacherPinModal
+        visible={showPinModal}
+        mode={pinModalMode}
+        onClose={() => setShowPinModal(false)}
+        onSuccess={handlePinSuccess}
+      />
     </View>
   );
 };
@@ -258,15 +297,31 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
   },
-  profileButton: {
+  topBar: {
     position: "absolute",
     top: 16,
+    left: 16,
     right: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    zIndex: 10,
+  },
+  teacherModeQuickButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  quickButtonText: {
+    fontSize: 24,
+  },
+  profileButton: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    zIndex: 10,
   },
   profileButtonText: {
     color: "#fff",
