@@ -151,12 +151,15 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const handleManageSubscription = () => {
-    // In a real app, this would open the App Store subscriptions
-    Alert.alert(
-      "Manage Subscription",
-      "This would open App Store subscription management",
-      [{ text: "OK" }]
-    );
+    if (subscription?.tier === "free") {
+      navigation.navigate("Paywall" as never);
+    } else {
+      Alert.alert(
+        "Manage Subscription",
+        "To manage your subscription, go to Settings > Apple ID > Subscriptions on your device.",
+        [{ text: "OK" }]
+      );
+    }
     AnalyticsService.track("subscription_manage_clicked");
   };
 
@@ -208,20 +211,35 @@ export const ProfileScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Subscription</Text>
         <View style={styles.subscriptionCard}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.subscriptionTier}>
               {subscription?.tier.toUpperCase() || "FREE"}
             </Text>
             <Text style={styles.subscriptionStatus}>
               Status: {subscription?.status || "active"}
             </Text>
+            {subscription?.isInGracePeriod && (
+              <Text style={styles.gracePeriodText}>
+                ⚠️ Grace period - payment issue
+              </Text>
+            )}
+            {subscription?.endDate && (
+              <Text style={styles.subscriptionEndDate}>
+                {subscription.status === "active" 
+                  ? `Renews: ${new Date(subscription.endDate).toLocaleDateString()}`
+                  : `Expired: ${new Date(subscription.endDate).toLocaleDateString()}`
+                }
+              </Text>
+            )}
           </View>
           <TouchableOpacity
             style={styles.manageButton}
             onPress={handleManageSubscription}
             testID="manage-subscription-button"
           >
-            <Text style={styles.manageButtonText}>Manage</Text>
+            <Text style={styles.manageButtonText}>
+              {subscription?.tier === "free" ? "Upgrade" : "Manage"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -452,6 +470,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginTop: 4,
+  },
+  subscriptionEndDate: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 4,
+  },
+  gracePeriodText: {
+    fontSize: 12,
+    color: "#FF9800",
+    marginTop: 4,
+    fontWeight: "600",
   },
   manageButton: {
     backgroundColor: "#007AFF",

@@ -11,16 +11,24 @@ import { useNavigation } from "@react-navigation/native";
 import GeminiService from "../services/GeminiService";
 import AnalyticsService from "../services/AnalyticsService";
 import GamificationService from "../services/GamificationService";
+import SubscriptionService from "../services/SubscriptionService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
 
 export const CaptureScreen: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [hasPremium, setHasPremium] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
+    checkSubscription();
     PerformanceMonitor.trackMemoryUsage("CaptureScreen_mount");
   }, []);
+
+  const checkSubscription = async () => {
+    const premium = await SubscriptionService.hasPremiumAccess();
+    setHasPremium(premium);
+  };
 
   const handleCapture = useCallback(async () => {
     try {
@@ -84,6 +92,18 @@ export const CaptureScreen: React.FC = () => {
         <Text style={styles.profileButtonText}>👤 Profile</Text>
       </TouchableOpacity>
 
+      {!hasPremium && (
+        <TouchableOpacity
+          style={styles.premiumBanner}
+          onPress={() => navigation.navigate("Paywall" as never)}
+          testID="premium-banner"
+        >
+          <Text style={styles.premiumBannerText}>
+            ⭐ Upgrade to Pro - Unlimited problems & AI tutor
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.cameraContainer}>
         {capturedImage ? (
           <View style={styles.preview} testID="image-preview">
@@ -145,6 +165,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  premiumBanner: {
+    backgroundColor: "#FFD700",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  premiumBannerText: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "600",
   },
   cameraContainer: {
     flex: 1,
