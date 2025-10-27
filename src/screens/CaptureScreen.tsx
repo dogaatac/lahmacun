@@ -153,13 +153,22 @@ export const CaptureScreen: React.FC = () => {
 
       <View style={styles.controls}>
         {!capturedImage ? (
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={handleCapture}
-            testID="capture-button"
-          >
-            <View style={styles.captureButtonInner} />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.documentsButton}
+              onPress={() => navigation.navigate("DocumentImport" as never)}
+              testID="documents-button"
+            >
+              <Text style={styles.documentsButtonText}>📄 My Documents</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={handleCapture}
+              testID="capture-button"
+            >
+              <View style={styles.captureButtonInner} />
+            </TouchableOpacity>
+          </>
         ) : (
           <View style={styles.actionButtons}>
             <TouchableOpacity
@@ -249,6 +258,20 @@ const styles = StyleSheet.create({
   controls: {
     padding: 30,
     alignItems: "center",
+  },
+  documentsButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  documentsButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   captureButton: {
     width: 70,

@@ -112,6 +112,72 @@ export class GeminiService {
     });
   }
 
+  async summarizeText(text: string, maxLength?: number): Promise<string> {
+    return PerformanceMonitor.measureAsync("api_summarize_text", async () => {
+      try {
+        const prompt = maxLength
+          ? `Summarize the following text in no more than ${maxLength} words:\n\n${text}`
+          : `Provide a concise summary of the following text:\n\n${text}`;
+
+        const response = await this.api.post(
+          `/models/gemini-pro:generateContent?key=${this.apiKey}`,
+          {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+          }
+        );
+
+        return response.data.candidates[0]?.content?.parts[0]?.text || "";
+      } catch (error) {
+        throw new Error(
+          `Failed to summarize text: ${(error as Error).message}`
+        );
+      }
+    });
+  }
+
+  async generateQuestionsFromText(
+    text: string,
+    count: number = 5
+  ): Promise<any[]> {
+    return PerformanceMonitor.measureAsync(
+      "api_generate_questions_from_text",
+      async () => {
+        try {
+          const response = await this.api.post(
+            `/models/gemini-pro:generateContent?key=${this.apiKey}`,
+            {
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Generate ${count} quiz questions based on the following text. Include the answer for each question:\n\n${text}`,
+                    },
+                  ],
+                },
+              ],
+            }
+          );
+
+          const responseText =
+            response.data.candidates[0]?.content?.parts[0]?.text || "";
+          return this.parseQuizQuestions(responseText, count);
+        } catch (error) {
+          throw new Error(
+            `Failed to generate questions: ${(error as Error).message}`
+          );
+        }
+      }
+    );
+  }
+
   async chat(
     message: string,
     conversationHistory: any[] = []

@@ -51,6 +51,16 @@ const SessionDetailScreen = lazy(() =>
     default: module.SessionDetailScreen,
   }))
 );
+const DocumentImportScreen = lazy(() =>
+  import("./src/screens/DocumentImportScreen").then((module) => ({
+    default: module.DocumentImportScreen,
+  }))
+);
+const DocumentDetailScreen = lazy(() =>
+  import("./src/screens/DocumentDetailScreen").then((module) => ({
+    default: module.DocumentDetailScreen,
+  }))
+);
 
 const Stack = createStackNavigator();
 
@@ -120,6 +130,16 @@ function App(): JSX.Element {
               name="SessionDetail"
               component={SessionDetailScreen}
               options={{ title: "Session Details" }}
+            />
+            <Stack.Screen
+              name="DocumentImport"
+              component={DocumentImportScreen}
+              options={{ title: "My Documents" }}
+            />
+            <Stack.Screen
+              name="DocumentDetail"
+              component={DocumentDetailScreen}
+              options={{ title: "Document Details" }}
             />
           </Stack.Navigator>
         </Suspense>
