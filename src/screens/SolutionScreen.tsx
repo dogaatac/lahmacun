@@ -10,6 +10,8 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import { ProblemAnalysis } from "../services/GeminiService";
 import AnalyticsService from "../services/AnalyticsService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
+import SessionService from "../services/SessionService";
+import UserService from "../services/UserService";
 
 export const SolutionScreen: React.FC = () => {
   const route = useRoute();
@@ -21,7 +23,34 @@ export const SolutionScreen: React.FC = () => {
       difficulty: solution?.difficulty,
     });
     PerformanceMonitor.trackMemoryUsage("SolutionScreen_mount");
+    
+    if (solution) {
+      createStudentSession();
+    }
   }, [solution]);
+
+  const createStudentSession = async () => {
+    try {
+      const profile = await UserService.getProfile();
+      if (profile && solution) {
+        const session = await SessionService.createSession(
+          profile.id,
+          profile.name,
+          `problem_${Date.now()}`,
+          solution.problem || "Math Problem",
+          undefined,
+          solution.difficulty
+        );
+        
+        await SessionService.updateSession(session.id, {
+          solution: solution.solution,
+          completed: true,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to create session:", error);
+    }
+  };
 
   const handleChat = useCallback(() => {
     AnalyticsService.track("open_chat_from_solution");

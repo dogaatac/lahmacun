@@ -41,6 +41,16 @@ const RemindersSettingsScreen = lazy(() =>
     default: module.RemindersSettingsScreen,
   }))
 );
+const TeacherDashboardScreen = lazy(() =>
+  import("./src/screens/TeacherDashboardScreen").then((module) => ({
+    default: module.TeacherDashboardScreen,
+  }))
+);
+const SessionDetailScreen = lazy(() =>
+  import("./src/screens/SessionDetailScreen").then((module) => ({
+    default: module.SessionDetailScreen,
+  }))
+);
 
 const Stack = createStackNavigator();
 
@@ -100,6 +110,16 @@ function App(): JSX.Element {
               name="RemindersSettings"
               component={RemindersSettingsScreen}
               options={{ title: "Study Reminders" }}
+            />
+            <Stack.Screen
+              name="TeacherDashboard"
+              component={TeacherDashboardScreen}
+              options={{ title: "Teacher Dashboard" }}
+            />
+            <Stack.Screen
+              name="SessionDetail"
+              component={SessionDetailScreen}
+              options={{ title: "Session Details" }}
             />
           </Stack.Navigator>
         </Suspense>

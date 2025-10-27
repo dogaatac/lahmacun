@@ -135,3 +135,79 @@ export interface PermissionStatus {
   canAskAgain: boolean;
   status: "granted" | "denied" | "undetermined";
 }
+
+export interface StudentSession {
+  id: string;
+  studentId: string;
+  studentName: string;
+  problemId: string;
+  problemTitle: string;
+  subject?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  startTime: number;
+  endTime?: number;
+  completed: boolean;
+  accuracy?: number;
+  flaggedDifficulties: string[];
+  solution?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SessionAnnotation {
+  id: string;
+  sessionId: string;
+  teacherId: string;
+  type: "text" | "highlight" | "note" | "correction";
+  content: string;
+  position?: { x: number; y: number };
+  sharedWithStudent: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TeacherFeedback {
+  id: string;
+  sessionId: string;
+  teacherId: string;
+  type: "audio" | "video" | "text";
+  content?: string;
+  filePath?: string;
+  duration?: number;
+  sharedWithStudent: boolean;
+  createdAt: number;
+}
+
+export interface FollowUpTask {
+  id: string;
+  sessionId: string;
+  studentId: string;
+  title: string;
+  description: string;
+  subject?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  dueDate?: number;
+  completed: boolean;
+  assignedBy: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface StudyPlan {
+  id: string;
+  studentId: string;
+  tasks: FollowUpTask[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TeacherProfile {
+  id: string;
+  name: string;
+  email: string;
+  pinHash?: string;
+  biometricEnabled: boolean;
+  students: string[];
+  createdAt: number;
+  updatedAt: number;
+}
