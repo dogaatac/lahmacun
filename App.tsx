@@ -36,6 +36,11 @@ const PaywallScreen = lazy(() =>
     default: module.PaywallScreen,
   }))
 );
+const RemindersSettingsScreen = lazy(() =>
+  import("./src/screens/RemindersSettingsScreen").then((module) => ({
+    default: module.RemindersSettingsScreen,
+  }))
+);
 
 const Stack = createStackNavigator();
 
@@ -90,6 +95,11 @@ function App(): JSX.Element {
               name="Paywall"
               component={PaywallScreen}
               options={{ title: "Upgrade" }}
+            />
+            <Stack.Screen
+              name="RemindersSettings"
+              component={RemindersSettingsScreen}
+              options={{ title: "Study Reminders" }}
             />
           </Stack.Navigator>
         </Suspense>

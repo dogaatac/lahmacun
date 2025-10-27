@@ -19,6 +19,17 @@ export interface UserSettings {
   analyticsConsent: boolean;
   teacherMode: boolean;
   autoBackup: boolean;
+  remindersEnabled?: boolean;
+  calendarSyncEnabled?: boolean;
+  reminderSettings?: ReminderSettings;
+}
+
+export interface ReminderSettings {
+  defaultReminderTime: number;
+  quietHoursEnabled: boolean;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  reminderDays: number[];
 }
 
 export interface SubscriptionTier {
@@ -95,4 +106,32 @@ export interface EntitlementCheck {
   tier: "free" | "premium" | "pro";
   expiryDate?: number;
   isInGracePeriod: boolean;
+}
+
+export interface StudySession {
+  id: string;
+  title: string;
+  description?: string;
+  subject?: string;
+  startTime: number;
+  endTime: number;
+  notificationId?: string;
+  calendarEventId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ReminderNotification {
+  id: string;
+  sessionId: string;
+  scheduledTime: number;
+  notificationId: string;
+  status: "scheduled" | "sent" | "cancelled";
+  createdAt: number;
+}
+
+export interface PermissionStatus {
+  granted: boolean;
+  canAskAgain: boolean;
+  status: "granted" | "denied" | "undetermined";
 }

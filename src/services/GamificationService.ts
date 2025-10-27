@@ -59,6 +59,7 @@ export class GamificationService {
   async getUserProgress(): Promise<UserProgress> {
     const progress = await StorageService.get<UserProgress>(
       this.STORAGE_KEY_PROGRESS
+    );
 
     if (!progress) {
       return this.createDefaultProgress();
