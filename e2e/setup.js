@@ -1,7 +1,7 @@
-const detox = require('detox');
-const config = require('../package.json').detox;
-const adapter = require('detox/runners/jest/adapter');
-const specReporter = require('detox/runners/jest/specReporter');
+const detox = require("detox");
+const config = require("../package.json").detox;
+const adapter = require("detox/runners/jest/adapter");
+const specReporter = require("detox/runners/jest/specReporter");
 
 jest.setTimeout(120000);
 jasmine.getEnv().addReporter(adapter);

@@ -1,0 +1,142 @@
+{
+  "timestamp": "2025-10-27T00:22:19.002Z",
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0
+  },
+  "thresholds": {
+    "maxRenderTime": 16.67,
+    "maxAPIResponseTime": 3000,
+    "maxMemoryUsageMB": 200,
+    "minFPS": 55
+  },
+  "results": [
+    {
+      "category": "Render",
+      "test": "ChatScreen FPS",
+      "value": "203.25",
+      "unit": "fps",
+      "target": 60,
+      "passed": true,
+      "details": "0 frame drops (0.0%)"
+    },
+    {
+      "category": "Render",
+      "test": "SolutionScreen FPS",
+      "value": "197.63",
+      "unit": "fps",
+      "target": 60,
+      "passed": true,
+      "details": "0 frame drops (0.0%)"
+    },
+    {
+      "category": "Render",
+      "test": "CaptureScreen FPS",
+      "value": "189.39",
+      "unit": "fps",
+      "target": 60,
+      "passed": true,
+      "details": "0 frame drops (0.0%)"
+    },
+    {
+      "category": "List",
+      "test": "10 items render",
+      "value": "3.00",
+      "unit": "ms",
+      "target": 20,
+      "passed": true,
+      "details": "0.30ms per item"
+    },
+    {
+      "category": "List",
+      "test": "50 items render",
+      "value": "11.00",
+      "unit": "ms",
+      "target": 100,
+      "passed": true,
+      "details": "0.22ms per item"
+    },
+    {
+      "category": "List",
+      "test": "100 items render",
+      "value": "21.00",
+      "unit": "ms",
+      "target": 200,
+      "passed": true,
+      "details": "0.21ms per item"
+    },
+    {
+      "category": "List",
+      "test": "500 items render",
+      "value": "108.00",
+      "unit": "ms",
+      "target": 1000,
+      "passed": true,
+      "details": "0.22ms per item"
+    },
+    {
+      "category": "Memory",
+      "test": "Idle State",
+      "value": "89.53",
+      "unit": "MB",
+      "target": 200,
+      "passed": true,
+      "details": "Peak usage"
+    },
+    {
+      "category": "Memory",
+      "test": "Chat with 100 messages",
+      "value": "129.30",
+      "unit": "MB",
+      "target": 200,
+      "passed": true,
+      "details": "Peak usage"
+    },
+    {
+      "category": "Memory",
+      "test": "Large PDF (50 pages)",
+      "value": "175.96",
+      "unit": "MB",
+      "target": 200,
+      "passed": true,
+      "details": "Peak usage"
+    },
+    {
+      "category": "API",
+      "test": "analyzeProblem",
+      "value": "2207.00",
+      "unit": "ms",
+      "target": 3000,
+      "passed": true,
+      "details": "Including network latency"
+    },
+    {
+      "category": "API",
+      "test": "chat",
+      "value": "1718.00",
+      "unit": "ms",
+      "target": 3000,
+      "passed": true,
+      "details": "Including network latency"
+    },
+    {
+      "category": "API",
+      "test": "generateQuiz",
+      "value": "2544.00",
+      "unit": "ms",
+      "target": 3000,
+      "passed": true,
+      "details": "Including network latency"
+    },
+    {
+      "category": "Bundle",
+      "test": "simulated Bundle Size",
+      "value": "2.54",
+      "unit": "MB",
+      "target": 5,
+      "passed": true,
+      "details": "Production build"
+    }
+  ]
+}

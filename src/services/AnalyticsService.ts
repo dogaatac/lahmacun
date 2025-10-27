@@ -8,7 +8,7 @@ export interface AnalyticsEvent {
 export interface UserProperties {
   userId: string;
   email?: string;
-  plan?: 'free' | 'premium' | 'pro';
+  plan?: "free" | "premium" | "pro";
   [key: string]: any;
 }
 
@@ -18,13 +18,15 @@ export class AnalyticsService {
   private enabled: boolean = true;
 
   track(eventName: string, properties?: Record<string, any>): void {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      return;
+    }
 
     const event: AnalyticsEvent = {
       name: eventName,
       properties: {
         ...properties,
-        platform: 'react-native',
+        platform: "react-native",
       },
       timestamp: Date.now(),
       userId: this.userProperties?.userId,
@@ -35,14 +37,14 @@ export class AnalyticsService {
   }
 
   trackScreen(screenName: string, properties?: Record<string, any>): void {
-    this.track('screen_view', {
+    this.track("screen_view", {
       screen_name: screenName,
       ...properties,
     });
   }
 
   trackError(error: Error, context?: Record<string, any>): void {
-    this.track('error', {
+    this.track("error", {
       error_message: error.message,
       error_stack: error.stack,
       ...context,
@@ -52,9 +54,9 @@ export class AnalyticsService {
   trackPurchase(
     productId: string,
     price: number,
-    currency: string = 'USD'
+    currency: string = "USD"
   ): void {
-    this.track('purchase', {
+    this.track("purchase", {
       product_id: productId,
       price,
       currency,
@@ -67,7 +69,7 @@ export class AnalyticsService {
     score: number,
     totalQuestions: number
   ): void {
-    this.track('quiz_completed', {
+    this.track("quiz_completed", {
       quiz_id: quizId,
       score,
       total_questions: totalQuestions,
@@ -80,7 +82,7 @@ export class AnalyticsService {
     difficulty: string,
     timeSpent: number
   ): void {
-    this.track('problem_solved', {
+    this.track("problem_solved", {
       problem_id: problemId,
       difficulty,
       time_spent: timeSpent,
@@ -94,7 +96,7 @@ export class AnalyticsService {
 
   setUserProperty(key: string, value: any): void {
     if (!this.userProperties) {
-      this.userProperties = { userId: 'anonymous' };
+      this.userProperties = { userId: "anonymous" };
     }
     this.userProperties[key] = value;
   }
@@ -127,14 +129,14 @@ export class AnalyticsService {
   private sendEvent(event: AnalyticsEvent): void {
     // In a real app, this would send to analytics service (Firebase, Mixpanel, etc.)
     if (__DEV__) {
-      console.log('[Analytics]', event.name, event.properties);
+      console.log("[Analytics]", event.name, event.properties);
     }
   }
 
   private sendUserProperties(properties: UserProperties): void {
     // In a real app, this would send to analytics service
     if (__DEV__) {
-      console.log('[Analytics] User identified:', properties.userId);
+      console.log("[Analytics] User identified:", properties.userId);
     }
   }
 
