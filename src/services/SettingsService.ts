@@ -92,6 +92,15 @@ export class SettingsService {
       analyticsConsent: true,
       teacherMode: false,
       autoBackup: true,
+      remindersEnabled: false,
+      calendarSyncEnabled: false,
+      reminderSettings: {
+        defaultReminderTime: 30,
+        quietHoursEnabled: false,
+        quietHoursStart: "22:00",
+        quietHoursEnd: "08:00",
+        reminderDays: [1, 2, 3, 4, 5],
+      },
     };
   }
 }

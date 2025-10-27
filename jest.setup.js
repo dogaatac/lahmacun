@@ -25,6 +25,34 @@ jest.mock("@react-navigation/native", () => {
   };
 });
 
+// Mock expo-notifications
+jest.mock("expo-notifications", () => ({
+  setNotificationHandler: jest.fn(),
+  getPermissionsAsync: jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
+  scheduleNotificationAsync: jest.fn(),
+  cancelScheduledNotificationAsync: jest.fn(),
+  cancelAllScheduledNotificationsAsync: jest.fn(),
+  getAllScheduledNotificationsAsync: jest.fn(),
+  AndroidNotificationPriority: {
+    HIGH: "high",
+  },
+}));
+
+// Mock react-native-calendar-events
+jest.mock("react-native-calendar-events", () => ({
+  default: {
+    requestPermissions: jest.fn(),
+    checkPermissions: jest.fn(),
+    findCalendars: jest.fn(),
+    saveCalendar: jest.fn(),
+    saveEvent: jest.fn(),
+    removeEvent: jest.fn(),
+    fetchAllEvents: jest.fn(),
+    findEventById: jest.fn(),
+  },
+}));
+
 // Global test utilities
 global.mockFetch = (response) => {
   global.fetch = jest.fn(() =>

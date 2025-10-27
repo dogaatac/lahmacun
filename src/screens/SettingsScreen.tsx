@@ -337,6 +337,20 @@ export const SettingsScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Features</Text>
 
+        <TouchableOpacity
+          style={styles.settingRow}
+          onPress={() => navigation.navigate("RemindersSettings" as never)}
+          testID="reminders-settings-button"
+        >
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingLabel}>Study Reminders</Text>
+            <Text style={styles.settingDescription}>
+              Configure notifications and calendar sync
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
             <Text style={styles.settingLabel}>Teacher Mode</Text>
@@ -486,6 +500,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
     marginTop: 2,
+  },
+  chevron: {
+    fontSize: 24,
+    color: "#999",
+    fontWeight: "300",
   },
   themeButtons: {
     flexDirection: "row",

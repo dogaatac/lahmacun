@@ -32,6 +32,7 @@ export class GeminiService {
     const cacheKey = CacheManager.getCacheKey(
       "problem",
       imageData.slice(0, 50)
+    );
 
     return PerformanceMonitor.measureAsync("api_analyze_problem", async () => {
       return CacheManager.getOrFetch(
