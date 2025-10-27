@@ -76,6 +76,14 @@ export const CaptureScreen: React.FC = () => {
 
   return (
     <View style={styles.container} testID="capture-screen">
+      <TouchableOpacity
+        style={styles.profileButton}
+        onPress={() => navigation.navigate("Profile" as never)}
+        testID="profile-button"
+      >
+        <Text style={styles.profileButtonText}>👤 Profile</Text>
+      </TouchableOpacity>
+
       <View style={styles.cameraContainer}>
         {capturedImage ? (
           <View style={styles.preview} testID="image-preview">
@@ -217,6 +225,21 @@ const styles = StyleSheet.create({
   analyzeText: {
     fontSize: 16,
     color: "#fff",
+    fontWeight: "600",
+  },
+  profileButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 10,
+  },
+  profileButtonText: {
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "600",
   },
 });
