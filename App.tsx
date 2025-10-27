@@ -21,6 +21,16 @@ const ChatScreen = lazy(() =>
     default: module.ChatScreen,
   }))
 );
+const ProfileScreen = lazy(() =>
+  import("./src/screens/ProfileScreen").then((module) => ({
+    default: module.ProfileScreen,
+  }))
+);
+const SettingsScreen = lazy(() =>
+  import("./src/screens/SettingsScreen").then((module) => ({
+    default: module.SettingsScreen,
+  }))
+);
 
 const Stack = createStackNavigator();
 
@@ -60,6 +70,16 @@ function App(): JSX.Element {
               name="Chat"
               component={ChatScreen}
               options={{ title: "Ask Questions" }}
+            />
+            <Stack.Screen
+              name="Profile"
+              component={ProfileScreen}
+              options={{ title: "Profile" }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{ title: "Settings" }}
             />
           </Stack.Navigator>
         </Suspense>
