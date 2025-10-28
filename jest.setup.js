@@ -53,6 +53,56 @@ jest.mock("react-native-calendar-events", () => ({
   },
 }));
 
+// Mock @react-native-voice/voice
+jest.mock("@react-native-voice/voice", () => {
+  const mockVoice = {
+    onSpeechStart: null,
+    onSpeechEnd: null,
+    onSpeechResults: null,
+    onSpeechPartialResults: null,
+    onSpeechError: null,
+    start: jest.fn().mockResolvedValue(undefined),
+    stop: jest.fn().mockResolvedValue(undefined),
+    cancel: jest.fn().mockResolvedValue(undefined),
+    destroy: jest.fn().mockResolvedValue(undefined),
+    isAvailable: jest.fn().mockResolvedValue(true),
+  };
+  return {
+    __esModule: true,
+    default: mockVoice,
+  };
+});
+
+// Mock react-native-tts
+jest.mock("react-native-tts", () => {
+  const mockTts = {
+    speak: jest.fn().mockResolvedValue(undefined),
+    stop: jest.fn().mockResolvedValue(undefined),
+    pause: jest.fn().mockResolvedValue(undefined),
+    resume: jest.fn().mockResolvedValue(undefined),
+    setDefaultLanguage: jest.fn(),
+    setDefaultRate: jest.fn(),
+    setDefaultPitch: jest.fn(),
+    setDefaultVoice: jest.fn(),
+    voices: jest.fn().mockResolvedValue([
+      { id: "en-US", name: "English (US)", language: "en-US" },
+    ]),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  };
+  return {
+    __esModule: true,
+    default: mockTts,
+  };
+});
+
+// Mock @react-native-community/slider
+jest.mock("@react-native-community/slider", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  return React.forwardRef((props, ref) => <View {...props} ref={ref} />);
+});
+
 // Global test utilities
 global.mockFetch = (response) => {
   global.fetch = jest.fn(() =>

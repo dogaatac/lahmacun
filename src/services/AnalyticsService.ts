@@ -131,6 +131,48 @@ export class AnalyticsService {
     });
   }
 
+  trackVoiceInput(
+    screen: string,
+    transcriptLength: number,
+    duration: number,
+    success: boolean
+  ): void {
+    this.track("voice_input_used", {
+      screen,
+      transcript_length: transcriptLength,
+      duration,
+      success,
+    });
+  }
+
+  trackTTSUsage(
+    screen: string,
+    textLength: number,
+    rate: number,
+    pitch: number,
+    action: "play" | "pause" | "stop" | "resume"
+  ): void {
+    this.track("tts_used", {
+      screen,
+      text_length: textLength,
+      rate,
+      pitch,
+      action,
+    });
+  }
+
+  trackVoiceAccessibility(
+    feature: "stt" | "tts",
+    timeSaved?: number,
+    usedWithVoiceOver?: boolean
+  ): void {
+    this.track("voice_accessibility", {
+      feature,
+      time_saved: timeSaved,
+      used_with_voiceover: usedWithVoiceOver,
+    });
+  }
+
   identify(userProperties: UserProperties): void {
     this.userProperties = userProperties;
     this.sendUserProperties(userProperties);

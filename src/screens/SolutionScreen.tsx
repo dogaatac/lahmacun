@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  AccessibilityInfo,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { ProblemAnalysis } from "../services/GeminiService";
@@ -18,6 +19,8 @@ import ResourceService from "../services/ResourceService";
 import { Resource, ExplanationMode } from "../types";
 import GeminiService from "../services/GeminiService";
 import CacheManager from "../utils/CacheManager";
+import VoiceService from "../services/VoiceService";
+import { TTSControls } from "../components/TTSControls";
 
 export const SolutionScreen: React.FC = () => {
   const route = useRoute();
@@ -28,25 +31,32 @@ export const SolutionScreen: React.FC = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [currentMode, setCurrentMode] = useState<ExplanationMode>("standard");
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [cachedSolutions, setCachedSolutions] = useState<Map<ExplanationMode, ProblemAnalysis>>(
-    new Map([["standard", initialSolution]])
-  );
+  const [cachedSolutions, setCachedSolutions] = useState<
+    Map<ExplanationMode, ProblemAnalysis>
+  >(new Map([["standard", initialSolution]]));
+  const [showTTSControls, setShowTTSControls] = useState(false);
+  const [ttsRate, setTTSRate] = useState(1.0);
+  const [ttsPitch, setTTSPitch] = useState(1.0);
 
   useEffect(() => {
     AnalyticsService.trackScreen("Solution", {
       difficulty: solution?.difficulty,
     });
     PerformanceMonitor.trackMemoryUsage("SolutionScreen_mount");
-    
+
     if (solution) {
       createStudentSession();
       loadResources();
     }
+
+    return () => {
+      VoiceService.stopSpeaking();
+    };
   }, [solution]);
 
   const loadResources = async () => {
     if (solution?.resources && solution.resources.length > 0) {
-      const converted = solution.resources.map(r =>
+      const converted = solution.resources.map((r) =>
         ResourceService.convertToResource(r, undefined, solution.difficulty)
       );
       setResources(converted);
@@ -65,7 +75,7 @@ export const SolutionScreen: React.FC = () => {
           undefined,
           solution.difficulty
         );
-        
+
         await SessionService.updateSession(session.id, {
           solution: solution.solution,
           completed: true,
@@ -91,83 +101,122 @@ export const SolutionScreen: React.FC = () => {
     navigation.goBack();
   }, [navigation]);
 
-  const handleModeChange = useCallback(async (mode: ExplanationMode) => {
-    if (mode === currentMode || isRegenerating) {
-      return;
-    }
+  const handleReadAloud = useCallback(() => {
+    setShowTTSControls(true);
+    AnalyticsService.track("tts_opened", { screen: "Solution" });
+    AccessibilityInfo.announceForAccessibility(
+      "Opening text to speech controls"
+    );
+  }, []);
 
-    const previousMode = currentMode;
-    const startTime = Date.now();
+  const handleCloseTTS = useCallback(() => {
+    setShowTTSControls(false);
+  }, []);
 
-    if (cachedSolutions.has(mode)) {
-      const cachedSolution = cachedSolutions.get(mode)!;
-      setSolution(cachedSolution);
-      setCurrentMode(mode);
-      
-      AnalyticsService.trackExplanationModeSwitch(
-        "Solution",
-        previousMode,
-        mode,
-        true
-      );
-      AnalyticsService.trackExplanationModeUsage(mode, "Solution");
-      
-      if (cachedSolution?.resources && cachedSolution.resources.length > 0) {
-        const converted = cachedSolution.resources.map(r =>
-          ResourceService.convertToResource(r, undefined, cachedSolution.difficulty)
-        );
-        setResources(converted);
+  const getSolutionText = useCallback((): string => {
+    if (!solution) return "";
+
+    let text = `Here is the solution. `;
+
+    solution.steps.forEach((step, index) => {
+      text += `Step ${index + 1}: ${step}. `;
+    });
+
+    text += `The final answer is: ${solution.solution}`;
+
+    return text;
+  }, [solution]);
+
+  const handleModeChange = useCallback(
+    async (mode: ExplanationMode) => {
+      if (mode === currentMode || isRegenerating) {
+        return;
       }
-      
-      return;
-    }
 
-    if (!imageData) {
-      console.warn("No image data available for regeneration");
-      return;
-    }
+      const previousMode = currentMode;
+      const startTime = Date.now();
 
-    setIsRegenerating(true);
-    
-    try {
-      const newSolution = await GeminiService.analyzeProblem(imageData, { mode });
-      const generationTime = Date.now() - startTime;
-      
-      setSolution(newSolution);
-      setCurrentMode(mode);
-      setCachedSolutions(prev => new Map(prev).set(mode, newSolution));
-      
-      AnalyticsService.trackExplanationModeSwitch(
-        "Solution",
-        previousMode,
-        mode,
-        false
-      );
-      AnalyticsService.trackExplanationModeUsage(mode, "Solution");
-      AnalyticsService.trackExplanationGeneration(
-        mode,
-        "Solution",
-        false,
-        generationTime
-      );
-      
-      if (newSolution?.resources && newSolution.resources.length > 0) {
-        const converted = newSolution.resources.map(r =>
-          ResourceService.convertToResource(r, undefined, newSolution.difficulty)
+      if (cachedSolutions.has(mode)) {
+        const cachedSolution = cachedSolutions.get(mode)!;
+        setSolution(cachedSolution);
+        setCurrentMode(mode);
+
+        AnalyticsService.trackExplanationModeSwitch(
+          "Solution",
+          previousMode,
+          mode,
+          true
         );
-        setResources(converted);
+        AnalyticsService.trackExplanationModeUsage(mode, "Solution");
+
+        if (cachedSolution?.resources && cachedSolution.resources.length > 0) {
+          const converted = cachedSolution.resources.map((r) =>
+            ResourceService.convertToResource(
+              r,
+              undefined,
+              cachedSolution.difficulty
+            )
+          );
+          setResources(converted);
+        }
+
+        return;
       }
-    } catch (error) {
-      console.error("Failed to regenerate solution:", error);
-      AnalyticsService.trackError(error as Error, { 
-        screen: "Solution",
-        action: "mode_switch",
-        mode
-      });
-    } finally {
-      setIsRegenerating(false);
-    }
-  }, [currentMode, cachedSolutions, imageData, isRegenerating]);
+
+      if (!imageData) {
+        console.warn("No image data available for regeneration");
+        return;
+      }
+
+      setIsRegenerating(true);
+
+      try {
+        const newSolution = await GeminiService.analyzeProblem(imageData, {
+          mode,
+        });
+        const generationTime = Date.now() - startTime;
+
+        setSolution(newSolution);
+        setCurrentMode(mode);
+        setCachedSolutions((prev) => new Map(prev).set(mode, newSolution));
+
+        AnalyticsService.trackExplanationModeSwitch(
+          "Solution",
+          previousMode,
+          mode,
+          false
+        );
+        AnalyticsService.trackExplanationModeUsage(mode, "Solution");
+        AnalyticsService.trackExplanationGeneration(
+          mode,
+          "Solution",
+          false,
+          generationTime
+        );
+
+        if (newSolution?.resources && newSolution.resources.length > 0) {
+          const converted = newSolution.resources.map((r) =>
+            ResourceService.convertToResource(
+              r,
+              undefined,
+              newSolution.difficulty
+            )
+          );
+          setResources(converted);
+        }
+      } catch (error) {
+        console.error("Failed to regenerate solution:", error);
+        AnalyticsService.trackError(error as Error, {
+          screen: "Solution",
+          action: "mode_switch",
+          mode,
+        });
+      } finally {
+        setIsRegenerating(false);
+      }
+    },
+    [currentMode, cachedSolutions, imageData, isRegenerating]
+  );
 
   const renderedSteps = useMemo(() => {
     if (!solution) {
@@ -211,7 +260,7 @@ export const SolutionScreen: React.FC = () => {
               style={[
                 styles.modeButton,
                 currentMode === "eli5" && styles.modeButtonActive,
-                isRegenerating && styles.modeButtonDisabled
+                isRegenerating && styles.modeButtonDisabled,
               ]}
               onPress={() => handleModeChange("eli5")}
               disabled={isRegenerating}
@@ -226,12 +275,12 @@ export const SolutionScreen: React.FC = () => {
                 🎈 ELI5
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[
                 styles.modeButton,
                 currentMode === "standard" && styles.modeButtonActive,
-                isRegenerating && styles.modeButtonDisabled
+                isRegenerating && styles.modeButtonDisabled,
               ]}
               onPress={() => handleModeChange("standard")}
               disabled={isRegenerating}
@@ -246,12 +295,12 @@ export const SolutionScreen: React.FC = () => {
                 📚 Standard
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[
                 styles.modeButton,
                 currentMode === "advanced" && styles.modeButtonActive,
-                isRegenerating && styles.modeButtonDisabled
+                isRegenerating && styles.modeButtonDisabled,
               ]}
               onPress={() => handleModeChange("advanced")}
               disabled={isRegenerating}
@@ -270,7 +319,9 @@ export const SolutionScreen: React.FC = () => {
           {isRegenerating && (
             <View style={styles.regeneratingIndicator}>
               <ActivityIndicator size="small" color="#007AFF" />
-              <Text style={styles.regeneratingText}>Generating {currentMode} explanation...</Text>
+              <Text style={styles.regeneratingText}>
+                Generating {currentMode} explanation...
+              </Text>
             </View>
           )}
         </View>
@@ -298,21 +349,43 @@ export const SolutionScreen: React.FC = () => {
 
       <View style={styles.footer}>
         <TouchableOpacity
+          style={styles.ttsButton}
+          onPress={handleReadAloud}
+          testID="read-aloud-button"
+          accessibilityLabel="Read solution aloud"
+          accessibilityRole="button"
+          accessibilityHint="Opens text-to-speech controls to hear the solution"
+        >
+          <Text style={styles.ttsButtonText}>🔊 Read Aloud</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.chatButton}
           onPress={handleChat}
           testID="ask-question-button"
+          accessibilityLabel="Ask a question"
+          accessibilityRole="button"
         >
-          <Text style={styles.chatButtonText}>💬 Ask a Question</Text>
+          <Text style={styles.chatButtonText}>💬 Ask Question</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.newProblemButton}
           onPress={handleNewProblem}
           testID="new-problem-button"
+          accessibilityLabel="New problem"
+          accessibilityRole="button"
         >
           <Text style={styles.newProblemButtonText}>New Problem</Text>
         </TouchableOpacity>
       </View>
+
+      <TTSControls
+        visible={showTTSControls}
+        text={getSolutionText()}
+        onClose={handleCloseTTS}
+        title="Read Solution Aloud"
+      />
     </View>
   );
 };
@@ -487,27 +560,38 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#eee",
-    gap: 12,
+    gap: 10,
+  },
+  ttsButton: {
+    backgroundColor: "#34C759",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  ttsButtonText: {
+    fontSize: 15,
+    color: "#fff",
+    fontWeight: "600",
   },
   chatButton: {
     backgroundColor: "#007AFF",
-    padding: 16,
+    padding: 14,
     borderRadius: 8,
     alignItems: "center",
   },
   chatButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#fff",
     fontWeight: "600",
   },
   newProblemButton: {
     backgroundColor: "#f0f0f0",
-    padding: 16,
+    padding: 14,
     borderRadius: 8,
     alignItems: "center",
   },
   newProblemButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#333",
     fontWeight: "600",
   },

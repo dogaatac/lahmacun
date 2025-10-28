@@ -16,6 +16,7 @@ import {
   Platform,
   ListRenderItem,
   Alert,
+  AccessibilityInfo,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import GeminiService from "../services/GeminiService";
@@ -24,6 +25,8 @@ import SubscriptionService from "../services/SubscriptionService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
 import { ResourcePanel } from "../components/ResourcePanel";
 import { Resource, ExplanationMode } from "../types";
+import VoiceService, { VoiceTranscript } from "../services/VoiceService";
+import { VoiceRecordingOverlay } from "../components/VoiceRecordingOverlay";
 
 interface Message {
   id: string;
@@ -54,20 +57,125 @@ export const ChatScreen: React.FC = () => {
   const [chatResources, setChatResources] = useState<Resource[]>([]);
   const [currentMode, setCurrentMode] = useState<ExplanationMode>("standard");
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceAvailable, setVoiceAvailable] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const voiceStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
     checkAccess();
+    checkVoiceAvailability();
     AnalyticsService.trackScreen("Chat", {
       hasContext: !!context,
     });
     PerformanceMonitor.trackMemoryUsage("ChatScreen_mount");
+
+    return () => {
+      VoiceService.destroy();
+    };
   }, [context]);
 
   const checkAccess = async () => {
     const access = await SubscriptionService.hasProAccess();
     setHasProAccess(access);
   };
+
+  const checkVoiceAvailability = async () => {
+    try {
+      const available = await VoiceService.isAvailable();
+      setVoiceAvailable(available);
+    } catch (error) {
+      console.error("Failed to check voice availability:", error);
+      setVoiceAvailable(false);
+    }
+  };
+
+  const handleVoiceInput = useCallback(async () => {
+    try {
+      setVoiceError(null);
+      setVoiceTranscript("");
+      setShowVoiceOverlay(true);
+      voiceStartTimeRef.current = Date.now();
+
+      await VoiceService.startRecording(
+        (transcript: VoiceTranscript) => {
+          setVoiceTranscript(transcript.text);
+          if (transcript.isFinal) {
+            AccessibilityInfo.announceForAccessibility(
+              `Transcript: ${transcript.text}`
+            );
+          }
+        },
+        (error: string) => {
+          setVoiceError(error);
+          setIsRecording(false);
+        }
+      );
+
+      setIsRecording(true);
+      AnalyticsService.track("voice_recording_started", { screen: "Chat" });
+    } catch (error) {
+      console.error("Failed to start voice recording:", error);
+      setVoiceError(
+        "Failed to start recording. Please check microphone permissions."
+      );
+      setIsRecording(false);
+    }
+  }, []);
+
+  const handleStopVoice = useCallback(async () => {
+    try {
+      const finalTranscript = await VoiceService.stopRecording();
+      const duration = Date.now() - voiceStartTimeRef.current;
+
+      setIsRecording(false);
+
+      if (finalTranscript.trim()) {
+        setInputText(finalTranscript);
+
+        AnalyticsService.trackVoiceInput(
+          "Chat",
+          finalTranscript.length,
+          duration,
+          true
+        );
+
+        AccessibilityInfo.announceForAccessibility("Voice input complete");
+      }
+    } catch (error) {
+      console.error("Failed to stop voice recording:", error);
+      setVoiceError("Failed to stop recording");
+
+      AnalyticsService.trackVoiceInput(
+        "Chat",
+        0,
+        Date.now() - voiceStartTimeRef.current,
+        false
+      );
+    }
+  }, []);
+
+  const handleCancelVoice = useCallback(async () => {
+    try {
+      await VoiceService.cancelRecording();
+      setIsRecording(false);
+      setVoiceTranscript("");
+      setShowVoiceOverlay(false);
+      setVoiceError(null);
+
+      AnalyticsService.track("voice_recording_cancelled", { screen: "Chat" });
+    } catch (error) {
+      console.error("Failed to cancel voice recording:", error);
+    }
+  }, []);
+
+  const handleCloseVoiceOverlay = useCallback(() => {
+    setShowVoiceOverlay(false);
+    setVoiceError(null);
+  }, []);
 
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || isLoading) {
@@ -104,7 +212,7 @@ export const ChatScreen: React.FC = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInputText("");
     setIsLoading(true);
-    setMessageCount(prev => prev + 1);
+    setMessageCount((prev) => prev + 1);
 
     AnalyticsService.track("chat_message_sent", {
       message_length: userMessage.text.length,
@@ -137,7 +245,7 @@ export const ChatScreen: React.FC = () => {
         confidence: response.confidence,
         explanation_mode: currentMode,
       });
-      
+
       AnalyticsService.trackExplanationGeneration(
         currentMode,
         "Chat",
@@ -158,21 +266,32 @@ export const ChatScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, messages, hasProAccess, messageCount, navigation, currentMode]);
+  }, [
+    inputText,
+    isLoading,
+    messages,
+    hasProAccess,
+    messageCount,
+    navigation,
+    currentMode,
+  ]);
 
-  const handleModeChange = useCallback((mode: ExplanationMode) => {
-    const previousMode = currentMode;
-    setCurrentMode(mode);
-    setShowModeSelector(false);
-    
-    AnalyticsService.trackExplanationModeSwitch(
-      "Chat",
-      previousMode,
-      mode,
-      false
-    );
-    AnalyticsService.trackExplanationModeUsage(mode, "Chat");
-  }, [currentMode]);
+  const handleModeChange = useCallback(
+    (mode: ExplanationMode) => {
+      const previousMode = currentMode;
+      setCurrentMode(mode);
+      setShowModeSelector(false);
+
+      AnalyticsService.trackExplanationModeSwitch(
+        "Chat",
+        previousMode,
+        mode,
+        false
+      );
+      AnalyticsService.trackExplanationModeUsage(mode, "Chat");
+    },
+    [currentMode]
+  );
 
   useEffect(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
@@ -211,7 +330,9 @@ export const ChatScreen: React.FC = () => {
           <Text style={styles.limitText}>
             {messageCount}/3 free messages used
           </Text>
-          <TouchableOpacity onPress={() => navigation.navigate("Paywall" as never)}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Paywall" as never)}
+          >
             <Text style={styles.upgradeLink}>Upgrade</Text>
           </TouchableOpacity>
         </View>
@@ -224,64 +345,77 @@ export const ChatScreen: React.FC = () => {
           testID="mode-selector-toggle"
         >
           <Text style={styles.modeSelectorText}>
-            Mode: {currentMode === "eli5" ? "🎈 ELI5" : currentMode === "advanced" ? "🔬 Advanced" : "📚 Standard"}
+            Mode:{" "}
+            {currentMode === "eli5"
+              ? "🎈 ELI5"
+              : currentMode === "advanced"
+              ? "🔬 Advanced"
+              : "📚 Standard"}
           </Text>
-          <Text style={styles.modeSelectorArrow}>{showModeSelector ? "▲" : "▼"}</Text>
+          <Text style={styles.modeSelectorArrow}>
+            {showModeSelector ? "▲" : "▼"}
+          </Text>
         </TouchableOpacity>
-        
+
         {showModeSelector && (
           <View style={styles.modeOptions}>
             <TouchableOpacity
               style={[
                 styles.modeOption,
-                currentMode === "eli5" && styles.modeOptionActive
+                currentMode === "eli5" && styles.modeOptionActive,
               ]}
               onPress={() => handleModeChange("eli5")}
               testID="chat-mode-eli5"
             >
-              <Text style={[
-                styles.modeOptionText,
-                currentMode === "eli5" && styles.modeOptionTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.modeOptionText,
+                  currentMode === "eli5" && styles.modeOptionTextActive,
+                ]}
+              >
                 🎈 ELI5 - Simple explanations for everyone
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[
                 styles.modeOption,
-                currentMode === "standard" && styles.modeOptionActive
+                currentMode === "standard" && styles.modeOptionActive,
               ]}
               onPress={() => handleModeChange("standard")}
               testID="chat-mode-standard"
             >
-              <Text style={[
-                styles.modeOptionText,
-                currentMode === "standard" && styles.modeOptionTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.modeOptionText,
+                  currentMode === "standard" && styles.modeOptionTextActive,
+                ]}
+              >
                 📚 Standard - Balanced explanations
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[
                 styles.modeOption,
-                currentMode === "advanced" && styles.modeOptionActive
+                currentMode === "advanced" && styles.modeOptionActive,
               ]}
               onPress={() => handleModeChange("advanced")}
               testID="chat-mode-advanced"
             >
-              <Text style={[
-                styles.modeOptionText,
-                currentMode === "advanced" && styles.modeOptionTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.modeOptionText,
+                  currentMode === "advanced" && styles.modeOptionTextActive,
+                ]}
+              >
                 🔬 Advanced - Technical details
               </Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
-      
+
       {chatResources.length > 0 && (
         <TouchableOpacity
           style={styles.resourceToggle}
@@ -289,7 +423,8 @@ export const ChatScreen: React.FC = () => {
           testID="toggle-resources-button"
         >
           <Text style={styles.resourceToggleText}>
-            📚 {showResources ? "Hide" : "Show"} Resources ({chatResources.length})
+            📚 {showResources ? "Hide" : "Show"} Resources (
+            {chatResources.length})
           </Text>
         </TouchableOpacity>
       )}
@@ -319,6 +454,19 @@ export const ChatScreen: React.FC = () => {
       />
 
       <View style={styles.inputContainer}>
+        {voiceAvailable && (
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={handleVoiceInput}
+            disabled={isLoading}
+            testID="voice-input-button"
+            accessibilityLabel="Voice input"
+            accessibilityRole="button"
+            accessibilityHint="Tap to start voice input"
+          >
+            <Text style={styles.voiceButtonText}>🎤</Text>
+          </TouchableOpacity>
+        )}
         <TextInput
           style={styles.input}
           placeholder="Ask a question..."
@@ -328,6 +476,8 @@ export const ChatScreen: React.FC = () => {
           multiline
           maxLength={500}
           testID="chat-input"
+          accessibilityLabel="Chat input"
+          accessibilityHint="Type your question here or use voice input"
         />
         <TouchableOpacity
           style={[
@@ -337,10 +487,22 @@ export const ChatScreen: React.FC = () => {
           onPress={handleSend}
           disabled={!inputText.trim() || isLoading}
           testID="send-button"
+          accessibilityLabel="Send message"
+          accessibilityRole="button"
         >
           <Text style={styles.sendButtonText}>Send</Text>
         </TouchableOpacity>
       </View>
+
+      <VoiceRecordingOverlay
+        visible={showVoiceOverlay}
+        transcript={voiceTranscript}
+        isRecording={isRecording}
+        error={voiceError}
+        onClose={handleCloseVoiceOverlay}
+        onStop={handleStopVoice}
+        onCancel={handleCancelVoice}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -497,7 +659,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#e0e0e0",
-    gap: 12,
+    gap: 8,
   },
   input: {
     flex: 1,
@@ -522,5 +684,16 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  voiceButtonText: {
+    fontSize: 20,
   },
 });
