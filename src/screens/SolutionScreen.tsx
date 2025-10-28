@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from "react";
+import React, { useEffect, useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,15 @@ import AnalyticsService from "../services/AnalyticsService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
 import SessionService from "../services/SessionService";
 import UserService from "../services/UserService";
+import { ResourcePanel } from "../components/ResourcePanel";
+import ResourceService from "../services/ResourceService";
+import { Resource } from "../types";
 
 export const SolutionScreen: React.FC = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const solution = (route.params as any)?.solution as ProblemAnalysis;
+  const [resources, setResources] = useState<Resource[]>([]);
 
   useEffect(() => {
     AnalyticsService.trackScreen("Solution", {
@@ -26,8 +30,18 @@ export const SolutionScreen: React.FC = () => {
     
     if (solution) {
       createStudentSession();
+      loadResources();
     }
   }, [solution]);
+
+  const loadResources = async () => {
+    if (solution?.resources && solution.resources.length > 0) {
+      const converted = solution.resources.map(r =>
+        ResourceService.convertToResource(r, undefined, solution.difficulty)
+      );
+      setResources(converted);
+    }
+  };
 
   const createStudentSession = async () => {
     try {
@@ -113,6 +127,14 @@ export const SolutionScreen: React.FC = () => {
             <Text style={styles.answerText}>{solution.solution}</Text>
           </View>
         </View>
+
+        {resources.length > 0 && (
+          <ResourcePanel
+            resources={resources}
+            contextId={`solution_${Date.now()}`}
+            difficulty={solution.difficulty}
+          />
+        )}
       </ScrollView>
 
       <View style={styles.footer}>

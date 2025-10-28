@@ -9,6 +9,7 @@ import {
   Alert,
   Clipboard,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import UserService from "../services/UserService";
@@ -16,7 +17,8 @@ import GamificationService from "../services/GamificationService";
 import SubscriptionService from "../services/SubscriptionService";
 import AnalyticsService from "../services/AnalyticsService";
 import TeacherModeService from "../services/TeacherModeService";
-import { UserProfile, MasterySnapshot, UserSubscription, APIKey } from "../types";
+import ResourceService from "../services/ResourceService";
+import { UserProfile, MasterySnapshot, UserSubscription, APIKey, BookmarkedResource } from "../types";
 import { TeacherPinModal } from "./TeacherPinModal";
 
 export const ProfileScreen: React.FC = () => {
@@ -33,6 +35,7 @@ export const ProfileScreen: React.FC = () => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinModalMode, setPinModalMode] = useState<"setup" | "verify">("verify");
   const [teacherModeActive, setTeacherModeActive] = useState(false);
+  const [bookmarkedResources, setBookmarkedResources] = useState<BookmarkedResource[]>([]);
 
   useEffect(() => {
     loadProfileData();
@@ -41,12 +44,13 @@ export const ProfileScreen: React.FC = () => {
   const loadProfileData = async () => {
     try {
       setLoading(true);
-      const [profileData, progress, subData, keyData, teacherMode] = await Promise.all([
+      const [profileData, progress, subData, keyData, teacherMode, bookmarks] = await Promise.all([
         UserService.getProfile(),
         GamificationService.getUserProgress(),
         SubscriptionService.getSubscription(),
         UserService.getAPIKey(),
         TeacherModeService.isTeacherModeActive(),
+        ResourceService.getBookmarkedResources(),
       ]);
 
       if (!profileData) {
@@ -77,6 +81,7 @@ export const ProfileScreen: React.FC = () => {
       setSubscription(subData);
       setApiKey(keyData);
       setTeacherModeActive(teacherMode);
+      setBookmarkedResources(bookmarks);
 
       AnalyticsService.trackScreen("Profile");
     } catch (error) {
@@ -190,6 +195,40 @@ export const ProfileScreen: React.FC = () => {
       setTeacherModeActive(true);
       navigation.navigate("TeacherDashboard" as never);
     }
+  };
+
+  const handleOpenResource = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+        AnalyticsService.track("bookmarked_resource_opened");
+      } else {
+        Alert.alert("Error", "Cannot open this URL");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to open resource");
+    }
+  };
+
+  const handleRemoveBookmark = async (resourceId: string) => {
+    Alert.alert(
+      "Remove Bookmark",
+      "Are you sure you want to remove this bookmark?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            await ResourceService.unbookmarkResource(resourceId);
+            const updated = bookmarkedResources.filter(r => r.id !== resourceId);
+            setBookmarkedResources(updated);
+            AnalyticsService.track("bookmark_removed");
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -385,6 +424,59 @@ export const ProfileScreen: React.FC = () => {
           >
             <Text style={styles.generateButtonText}>Generate API Key</Text>
           </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Bookmarked Resources */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          Bookmarked Resources ({bookmarkedResources.length})
+        </Text>
+        {bookmarkedResources.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No bookmarked resources yet. Bookmark resources from solution or chat screens.
+          </Text>
+        ) : (
+          <View>
+            {bookmarkedResources.slice(0, 5).map((resource) => (
+              <View key={resource.id} style={styles.bookmarkItem}>
+                <View style={styles.bookmarkContent}>
+                  <Text style={styles.bookmarkTitle} numberOfLines={1}>
+                    {resource.title}
+                  </Text>
+                  <Text style={styles.bookmarkType}>
+                    {resource.type.toUpperCase()} • {resource.source === "teacher" ? "👨‍🏫" : "🤖"}
+                  </Text>
+                  {resource.notes && (
+                    <Text style={styles.bookmarkNotes} numberOfLines={2}>
+                      {resource.notes}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.bookmarkActions}>
+                  {resource.url && (
+                    <TouchableOpacity
+                      onPress={() => handleOpenResource(resource.url)}
+                      testID={`open-bookmark-${resource.id}`}
+                    >
+                      <Text style={styles.bookmarkActionText}>Open</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => handleRemoveBookmark(resource.id)}
+                    testID={`remove-bookmark-${resource.id}`}
+                  >
+                    <Text style={styles.bookmarkRemoveText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+            {bookmarkedResources.length > 5 && (
+              <Text style={styles.moreText}>
+                +{bookmarkedResources.length - 5} more bookmarks
+              </Text>
+            )}
+          </View>
         )}
       </View>
 
@@ -659,5 +751,60 @@ const styles = StyleSheet.create({
   teacherModeArrow: {
     fontSize: 24,
     color: "#007AFF",
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#999",
+    fontStyle: "italic",
+  },
+  bookmarkItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f9f9f9",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  bookmarkContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  bookmarkTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  bookmarkType: {
+    fontSize: 11,
+    color: "#666",
+    marginBottom: 4,
+  },
+  bookmarkNotes: {
+    fontSize: 12,
+    color: "#888",
+    fontStyle: "italic",
+  },
+  bookmarkActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  bookmarkActionText: {
+    fontSize: 14,
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  bookmarkRemoveText: {
+    fontSize: 14,
+    color: "#FF3B30",
+    fontWeight: "600",
+  },
+  moreText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 8,
+    fontStyle: "italic",
   },
 });

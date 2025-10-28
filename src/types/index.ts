@@ -286,3 +286,41 @@ export interface QuizQuestion {
   explanation?: string;
   difficulty?: "easy" | "medium" | "hard";
 }
+
+export type ResourceType = "textbook" | "video" | "website" | "article" | "course";
+
+export type ResourceSource = "ai" | "teacher";
+
+export interface Resource {
+  id: string;
+  title: string;
+  type: ResourceType;
+  url: string;
+  summary: string;
+  subject?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  source: ResourceSource;
+  authorCitation?: string;
+  createdAt: number;
+  metadata?: {
+    duration?: string;
+    pageCount?: number;
+    language?: string;
+    [key: string]: any;
+  };
+}
+
+export interface BookmarkedResource extends Resource {
+  bookmarkedAt: number;
+  notes?: string;
+  tags?: string[];
+}
+
+export interface ResourceRecommendations {
+  id: string;
+  problemId?: string;
+  contextId?: string;
+  resources: Resource[];
+  generatedAt: number;
+  cached: boolean;
+}

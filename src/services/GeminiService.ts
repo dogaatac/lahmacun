@@ -11,6 +11,14 @@ export interface ProblemAnalysis {
   solution: string;
   steps: string[];
   difficulty: "easy" | "medium" | "hard";
+  problem?: string;
+  resources?: Array<{
+    title: string;
+    type: string;
+    url: string;
+    summary: string;
+    citation?: string;
+  }>;
 }
 
 export class GeminiService {
@@ -46,7 +54,17 @@ export class GeminiService {
                   {
                     parts: [
                       {
-                        text: "Analyze this math problem and provide a solution",
+                        text: `Analyze this math problem and provide a solution. Also, suggest 3-5 relevant learning resources (textbooks, videos, websites) with citations that would help understand this topic better. Format your response as:
+
+SOLUTION:
+[solution steps]
+
+FINAL ANSWER:
+[answer]
+
+RESOURCES:
+1. [Type: textbook/video/website] [Title] - [Brief summary] - [URL or Citation]
+2. ...`,
                       },
                       {
                         inline_data: {
@@ -214,13 +232,60 @@ export class GeminiService {
 
   private parseSolution(text: string): ProblemAnalysis {
     const lines = text.split("\n").filter((line) => line.trim());
-    const steps = lines.slice(1, -1);
+    
+    const resourcesIndex = lines.findIndex(line => 
+      line.toUpperCase().includes("RESOURCES:")
+    );
+    
+    const solutionLines = resourcesIndex > 0 ? lines.slice(0, resourcesIndex) : lines;
+    const finalAnswerIndex = solutionLines.findIndex(line => 
+      line.toUpperCase().includes("FINAL ANSWER:")
+    );
+    
+    const steps = finalAnswerIndex > 0 
+      ? solutionLines.slice(1, finalAnswerIndex)
+      : solutionLines.slice(1, -1);
+    
+    const solution = finalAnswerIndex > 0 && finalAnswerIndex < solutionLines.length - 1
+      ? solutionLines.slice(finalAnswerIndex + 1).join(" ").trim()
+      : (solutionLines[solutionLines.length - 1] || text);
+
+    const resources = resourcesIndex > 0 
+      ? this.parseResources(lines.slice(resourcesIndex + 1))
+      : [];
 
     return {
-      solution: lines[lines.length - 1] || text,
+      solution,
       steps,
       difficulty: this.estimateDifficulty(steps.length),
+      resources,
     };
+  }
+
+  private parseResources(resourceLines: string[]): Array<{
+    title: string;
+    type: string;
+    url: string;
+    summary: string;
+    citation?: string;
+  }> {
+    const resources = [];
+    
+    for (const line of resourceLines) {
+      const match = line.match(/\[Type:\s*(\w+)\]\s*(.+?)\s*-\s*(.+?)\s*-\s*(.+)/i);
+      if (match) {
+        const [, type, title, summary, urlOrCitation] = match;
+        resources.push({
+          type: type.toLowerCase(),
+          title: title.trim(),
+          summary: summary.trim(),
+          url: urlOrCitation.trim().startsWith("http") ? urlOrCitation.trim() : "",
+          citation: !urlOrCitation.trim().startsWith("http") ? urlOrCitation.trim() : undefined,
+        });
+      }
+    }
+    
+    return resources;
   }
 
   private estimateDifficulty(stepsCount: number): "easy" | "medium" | "hard" {

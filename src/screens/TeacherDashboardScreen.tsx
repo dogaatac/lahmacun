@@ -15,7 +15,8 @@ import TeacherModeService from "../services/TeacherModeService";
 import SessionService from "../services/SessionService";
 import StudyPlanService from "../services/StudyPlanService";
 import AnalyticsService from "../services/AnalyticsService";
-import { StudentSession, TeacherProfile } from "../types";
+import ResourceService from "../services/ResourceService";
+import { StudentSession, TeacherProfile, ResourceType } from "../types";
 
 export const TeacherDashboardScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -24,6 +25,15 @@ export const TeacherDashboardScreen: React.FC = () => {
   const [sessions, setSessions] = useState<StudentSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<StudentSession | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [showAddResourceModal, setShowAddResourceModal] = useState(false);
+  const [resourceForm, setResourceForm] = useState({
+    title: "",
+    type: "website" as ResourceType,
+    url: "",
+    summary: "",
+    subject: "",
+    difficulty: "medium" as "easy" | "medium" | "hard",
+  });
 
   useEffect(() => {
     loadDashboardData();
@@ -77,6 +87,38 @@ export const TeacherDashboardScreen: React.FC = () => {
     return { total, completed, flagged, averageAccuracy };
   };
 
+  const handleAddResource = async () => {
+    if (!resourceForm.title || !resourceForm.url || !resourceForm.summary) {
+      Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
+
+    try {
+      await ResourceService.addTeacherResource(
+        resourceForm.title,
+        resourceForm.type,
+        resourceForm.url,
+        resourceForm.summary,
+        resourceForm.subject || undefined,
+        resourceForm.difficulty
+      );
+      
+      Alert.alert("Success", "Resource added successfully");
+      setShowAddResourceModal(false);
+      setResourceForm({
+        title: "",
+        type: "website",
+        url: "",
+        summary: "",
+        subject: "",
+        difficulty: "medium",
+      });
+      AnalyticsService.track("teacher_resource_added");
+    } catch (error) {
+      Alert.alert("Error", "Failed to add resource");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -127,6 +169,16 @@ export const TeacherDashboardScreen: React.FC = () => {
             </Text>
             <Text style={styles.statLabel}>Avg Accuracy</Text>
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.addResourceButton}
+            onPress={() => setShowAddResourceModal(true)}
+            testID="add-resource-button"
+          >
+            <Text style={styles.addResourceButtonText}>➕ Add Custom Resource</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -213,6 +265,125 @@ export const TeacherDashboardScreen: React.FC = () => {
                 testID="confirm-exit-button"
               >
                 <Text style={styles.modalConfirmButtonText}>Exit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showAddResourceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddResourceModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.resourceModalContent]}>
+            <Text style={styles.modalTitle}>Add Custom Resource</Text>
+            <ScrollView style={styles.resourceForm}>
+              <Text style={styles.formLabel}>Title *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={resourceForm.title}
+                onChangeText={(text) => setResourceForm({ ...resourceForm, title: text })}
+                placeholder="e.g., Khan Academy Algebra"
+                testID="resource-title-input"
+              />
+
+              <Text style={styles.formLabel}>Type</Text>
+              <View style={styles.typeSelector}>
+                {(["textbook", "video", "website", "article", "course"] as ResourceType[]).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.typeOption,
+                      resourceForm.type === type && styles.typeOptionSelected,
+                    ]}
+                    onPress={() => setResourceForm({ ...resourceForm, type })}
+                    testID={`type-${type}`}
+                  >
+                    <Text
+                      style={[
+                        styles.typeOptionText,
+                        resourceForm.type === type && styles.typeOptionTextSelected,
+                      ]}
+                    >
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.formLabel}>URL *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={resourceForm.url}
+                onChangeText={(text) => setResourceForm({ ...resourceForm, url: text })}
+                placeholder="https://..."
+                keyboardType="url"
+                autoCapitalize="none"
+                testID="resource-url-input"
+              />
+
+              <Text style={styles.formLabel}>Summary *</Text>
+              <TextInput
+                style={[styles.formInput, styles.formTextArea]}
+                value={resourceForm.summary}
+                onChangeText={(text) => setResourceForm({ ...resourceForm, summary: text })}
+                placeholder="Brief description of the resource"
+                multiline
+                numberOfLines={3}
+                testID="resource-summary-input"
+              />
+
+              <Text style={styles.formLabel}>Subject (Optional)</Text>
+              <TextInput
+                style={styles.formInput}
+                value={resourceForm.subject}
+                onChangeText={(text) => setResourceForm({ ...resourceForm, subject: text })}
+                placeholder="e.g., Math, Physics"
+                testID="resource-subject-input"
+              />
+
+              <Text style={styles.formLabel}>Difficulty</Text>
+              <View style={styles.difficultySelector}>
+                {(["easy", "medium", "hard"] as const).map((diff) => (
+                  <TouchableOpacity
+                    key={diff}
+                    style={[
+                      styles.difficultyOption,
+                      resourceForm.difficulty === diff && styles.difficultyOptionSelected,
+                    ]}
+                    onPress={() => setResourceForm({ ...resourceForm, difficulty: diff })}
+                    testID={`difficulty-${diff}`}
+                  >
+                    <Text
+                      style={[
+                        styles.difficultyOptionText,
+                        resourceForm.difficulty === diff && styles.difficultyOptionTextSelected,
+                      ]}
+                    >
+                      {diff}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowAddResourceModal(false)}
+                testID="cancel-add-resource-button"
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={handleAddResource}
+                testID="confirm-add-resource-button"
+              >
+                <Text style={styles.modalConfirmButtonText}>Add</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -447,6 +618,95 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalConfirmButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  addResourceButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  addResourceButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  resourceModalContent: {
+    maxHeight: "80%",
+  },
+  resourceForm: {
+    marginVertical: 16,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  formTextArea: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  typeSelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  typeOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
+  },
+  typeOptionSelected: {
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
+  },
+  typeOptionText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  typeOptionTextSelected: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  difficultySelector: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  difficultyOption: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
+    alignItems: "center",
+  },
+  difficultyOptionSelected: {
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
+  },
+  difficultyOptionText: {
+    fontSize: 14,
+    color: "#333",
+    textTransform: "capitalize",
+  },
+  difficultyOptionTextSelected: {
     color: "#fff",
     fontWeight: "600",
   },
