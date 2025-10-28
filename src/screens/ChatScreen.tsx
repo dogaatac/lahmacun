@@ -22,12 +22,15 @@ import GeminiService from "../services/GeminiService";
 import AnalyticsService from "../services/AnalyticsService";
 import SubscriptionService from "../services/SubscriptionService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
+import { ResourcePanel } from "../components/ResourcePanel";
+import { Resource } from "../types";
 
 interface Message {
   id: string;
   text: string;
   isUser: boolean;
   timestamp: number;
+  hasResources?: boolean;
 }
 
 export const ChatScreen: React.FC = () => {
@@ -47,6 +50,8 @@ export const ChatScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const [hasProAccess, setHasProAccess] = useState(false);
+  const [showResources, setShowResources] = useState(false);
+  const [chatResources, setChatResources] = useState<Resource[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -181,6 +186,28 @@ export const ChatScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+      
+      {chatResources.length > 0 && (
+        <TouchableOpacity
+          style={styles.resourceToggle}
+          onPress={() => setShowResources(!showResources)}
+          testID="toggle-resources-button"
+        >
+          <Text style={styles.resourceToggleText}>
+            📚 {showResources ? "Hide" : "Show"} Resources ({chatResources.length})
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {showResources && chatResources.length > 0 && (
+        <View style={styles.resourcesContainer}>
+          <ResourcePanel
+            resources={chatResources}
+            contextId={`chat_${Date.now()}`}
+          />
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
         data={listData}
@@ -271,6 +298,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#007AFF",
     fontWeight: "600",
+  },
+  resourceToggle: {
+    backgroundColor: "#e8f4fd",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#c8e4f8",
+  },
+  resourceToggleText: {
+    fontSize: 14,
+    color: "#007AFF",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  resourcesContainer: {
+    maxHeight: 300,
+    backgroundColor: "#f5f5f5",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
   },
   messagesContainer: {
     flex: 1,
