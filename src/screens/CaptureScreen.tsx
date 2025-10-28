@@ -72,7 +72,10 @@ export const CaptureScreen: React.FC = () => {
 
       await GamificationService.recordProblemSolved();
 
-      navigation.navigate("Solution" as never, { solution: result } as never);
+      navigation.navigate("Solution" as never, { 
+        solution: result, 
+        imageData: capturedImage 
+      } as never);
     } catch (error) {
       AnalyticsService.trackError(error as Error, { screen: "Capture" });
       Alert.alert("Error", "Failed to analyze problem");

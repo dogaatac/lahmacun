@@ -89,6 +89,48 @@ export class AnalyticsService {
     });
   }
 
+  trackExplanationModeSwitch(
+    screen: string,
+    fromMode: string,
+    toMode: string,
+    usedCache: boolean
+  ): void {
+    this.track("explanation_mode_switch", {
+      screen,
+      from_mode: fromMode,
+      to_mode: toMode,
+      used_cache: usedCache,
+    });
+  }
+
+  trackExplanationModeUsage(
+    mode: string,
+    screen: string,
+    depth?: string,
+    tone?: string
+  ): void {
+    this.track("explanation_mode_usage", {
+      mode,
+      screen,
+      depth,
+      tone,
+    });
+  }
+
+  trackExplanationGeneration(
+    mode: string,
+    screen: string,
+    cached: boolean,
+    generationTime?: number
+  ): void {
+    this.track("explanation_generation", {
+      mode,
+      screen,
+      cached,
+      generation_time: generationTime,
+    });
+  }
+
   identify(userProperties: UserProperties): void {
     this.userProperties = userProperties;
     this.sendUserProperties(userProperties);

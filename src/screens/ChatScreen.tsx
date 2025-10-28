@@ -23,7 +23,7 @@ import AnalyticsService from "../services/AnalyticsService";
 import SubscriptionService from "../services/SubscriptionService";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
 import { ResourcePanel } from "../components/ResourcePanel";
-import { Resource } from "../types";
+import { Resource, ExplanationMode } from "../types";
 
 interface Message {
   id: string;
@@ -52,6 +52,8 @@ export const ChatScreen: React.FC = () => {
   const [hasProAccess, setHasProAccess] = useState(false);
   const [showResources, setShowResources] = useState(false);
   const [chatResources, setChatResources] = useState<Resource[]>([]);
+  const [currentMode, setCurrentMode] = useState<ExplanationMode>("standard");
+  const [showModeSelector, setShowModeSelector] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -108,13 +110,19 @@ export const ChatScreen: React.FC = () => {
       message_length: userMessage.text.length,
       has_pro_access: hasProAccess,
       message_count: messageCount + 1,
+      explanation_mode: currentMode,
     });
+
+    const startTime = Date.now();
 
     try {
       const response = await GeminiService.chat(
         userMessage.text,
-        messages.map((m) => ({ parts: [{ text: m.text }] }))
+        messages.map((m) => ({ parts: [{ text: m.text }] })),
+        { mode: currentMode }
       );
+
+      const generationTime = Date.now() - startTime;
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -127,7 +135,15 @@ export const ChatScreen: React.FC = () => {
 
       AnalyticsService.track("chat_response_received", {
         confidence: response.confidence,
+        explanation_mode: currentMode,
       });
+      
+      AnalyticsService.trackExplanationGeneration(
+        currentMode,
+        "Chat",
+        false,
+        generationTime
+      );
     } catch (error) {
       AnalyticsService.trackError(error as Error, { screen: "Chat" });
 
@@ -142,7 +158,21 @@ export const ChatScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, messages, hasProAccess, messageCount, navigation]);
+  }, [inputText, isLoading, messages, hasProAccess, messageCount, navigation, currentMode]);
+
+  const handleModeChange = useCallback((mode: ExplanationMode) => {
+    const previousMode = currentMode;
+    setCurrentMode(mode);
+    setShowModeSelector(false);
+    
+    AnalyticsService.trackExplanationModeSwitch(
+      "Chat",
+      previousMode,
+      mode,
+      false
+    );
+    AnalyticsService.trackExplanationModeUsage(mode, "Chat");
+  }, [currentMode]);
 
   useEffect(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
@@ -186,6 +216,71 @@ export const ChatScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      <View style={styles.modeSelector}>
+        <TouchableOpacity
+          style={styles.modeSelectorToggle}
+          onPress={() => setShowModeSelector(!showModeSelector)}
+          testID="mode-selector-toggle"
+        >
+          <Text style={styles.modeSelectorText}>
+            Mode: {currentMode === "eli5" ? "🎈 ELI5" : currentMode === "advanced" ? "🔬 Advanced" : "📚 Standard"}
+          </Text>
+          <Text style={styles.modeSelectorArrow}>{showModeSelector ? "▲" : "▼"}</Text>
+        </TouchableOpacity>
+        
+        {showModeSelector && (
+          <View style={styles.modeOptions}>
+            <TouchableOpacity
+              style={[
+                styles.modeOption,
+                currentMode === "eli5" && styles.modeOptionActive
+              ]}
+              onPress={() => handleModeChange("eli5")}
+              testID="chat-mode-eli5"
+            >
+              <Text style={[
+                styles.modeOptionText,
+                currentMode === "eli5" && styles.modeOptionTextActive
+              ]}>
+                🎈 ELI5 - Simple explanations for everyone
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.modeOption,
+                currentMode === "standard" && styles.modeOptionActive
+              ]}
+              onPress={() => handleModeChange("standard")}
+              testID="chat-mode-standard"
+            >
+              <Text style={[
+                styles.modeOptionText,
+                currentMode === "standard" && styles.modeOptionTextActive
+              ]}>
+                📚 Standard - Balanced explanations
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.modeOption,
+                currentMode === "advanced" && styles.modeOptionActive
+              ]}
+              onPress={() => handleModeChange("advanced")}
+              testID="chat-mode-advanced"
+            >
+              <Text style={[
+                styles.modeOptionText,
+                currentMode === "advanced" && styles.modeOptionTextActive
+              ]}>
+                🔬 Advanced - Technical details
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
       
       {chatResources.length > 0 && (
         <TouchableOpacity
@@ -296,6 +391,49 @@ const styles = StyleSheet.create({
   },
   upgradeLink: {
     fontSize: 14,
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  modeSelector: {
+    backgroundColor: "#f9f9f9",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  modeSelectorToggle: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  modeSelectorText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  modeSelectorArrow: {
+    fontSize: 12,
+    color: "#666",
+  },
+  modeOptions: {
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+  },
+  modeOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modeOptionActive: {
+    backgroundColor: "#e8f4fd",
+  },
+  modeOptionText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  modeOptionTextActive: {
     color: "#007AFF",
     fontWeight: "600",
   },
