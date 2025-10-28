@@ -324,3 +324,21 @@ export interface ResourceRecommendations {
   generatedAt: number;
   cached: boolean;
 }
+
+export type ExplanationMode = "eli5" | "standard" | "advanced";
+export type ExplanationDepth = "brief" | "normal" | "detailed";
+export type ExplanationTone = "casual" | "formal" | "technical";
+
+export interface ExplanationPreferences {
+  mode: ExplanationMode;
+  depth?: ExplanationDepth;
+  tone?: ExplanationTone;
+}
+
+export interface CachedExplanation {
+  content: string;
+  mode: ExplanationMode;
+  depth?: ExplanationDepth;
+  tone?: ExplanationTone;
+  generatedAt: number;
+}

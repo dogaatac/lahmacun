@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import CacheManager from "../utils/CacheManager";
 import PerformanceMonitor from "../utils/PerformanceMonitor";
+import { ExplanationMode, ExplanationDepth, ExplanationTone } from "../types";
 
 export interface GeminiResponse {
   text: string;
@@ -21,6 +22,12 @@ export interface ProblemAnalysis {
   }>;
 }
 
+export interface ExplanationOptions {
+  mode?: ExplanationMode;
+  depth?: ExplanationDepth;
+  tone?: ExplanationTone;
+}
+
 export class GeminiService {
   private api: AxiosInstance;
   private apiKey: string;
@@ -36,10 +43,77 @@ export class GeminiService {
     });
   }
 
-  async analyzeProblem(imageData: string): Promise<ProblemAnalysis> {
+  private buildModePrompt(options?: ExplanationOptions): string {
+    const mode = options?.mode || "standard";
+    const depth = options?.depth || "normal";
+    const tone = options?.tone || "formal";
+
+    let modeInstruction = "";
+    
+    switch (mode) {
+      case "eli5":
+        modeInstruction = "Explain this like I'm 5 years old. Use simple words, everyday examples, and avoid technical jargon. Make it fun and easy to understand for a child.";
+        break;
+      case "advanced":
+        modeInstruction = "Provide an advanced, in-depth explanation with technical details, mathematical rigor, and theoretical background. Assume the reader has strong foundational knowledge.";
+        break;
+      case "standard":
+      default:
+        modeInstruction = "Provide a clear, balanced explanation suitable for a typical student. Include key concepts without overwhelming detail.";
+        break;
+    }
+
+    let depthInstruction = "";
+    switch (depth) {
+      case "brief":
+        depthInstruction = " Keep it concise and to the point.";
+        break;
+      case "detailed":
+        depthInstruction = " Provide comprehensive details and thorough explanations.";
+        break;
+      case "normal":
+      default:
+        depthInstruction = " Use a moderate level of detail.";
+        break;
+    }
+
+    let toneInstruction = "";
+    switch (tone) {
+      case "casual":
+        toneInstruction = " Use a friendly, conversational tone.";
+        break;
+      case "technical":
+        toneInstruction = " Use precise, technical language.";
+        break;
+      case "formal":
+      default:
+        toneInstruction = " Use a professional, educational tone.";
+        break;
+    }
+
+    if (__DEV__) {
+      console.log("[GeminiService] Prompt Instructions:", {
+        mode,
+        depth,
+        tone,
+        fullInstruction: modeInstruction + depthInstruction + toneInstruction
+      });
+    }
+
+    return modeInstruction + depthInstruction + toneInstruction;
+  }
+
+  async analyzeProblem(imageData: string, options?: ExplanationOptions): Promise<ProblemAnalysis> {
+    const mode = options?.mode || "standard";
+    const depth = options?.depth || "normal";
+    const tone = options?.tone || "formal";
+    
     const cacheKey = CacheManager.getCacheKey(
       "problem",
-      imageData.slice(0, 50)
+      imageData.slice(0, 50),
+      mode,
+      depth,
+      tone
     );
 
     return PerformanceMonitor.measureAsync("api_analyze_problem", async () => {
@@ -47,14 +121,8 @@ export class GeminiService {
         cacheKey,
         async () => {
           try {
-            const response = await this.api.post(
-              `/models/gemini-pro-vision:generateContent?key=${this.apiKey}`,
-              {
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: `Analyze this math problem and provide a solution. Also, suggest 3-5 relevant learning resources (textbooks, videos, websites) with citations that would help understand this topic better. Format your response as:
+            const modePrompt = this.buildModePrompt(options);
+            const basePrompt = `Analyze this math problem and provide a solution. ${modePrompt} Also, suggest 3-5 relevant learning resources (textbooks, videos, websites) with citations that would help understand this topic better. Format your response as:
 
 SOLUTION:
 [solution steps]
@@ -64,7 +132,25 @@ FINAL ANSWER:
 
 RESOURCES:
 1. [Type: textbook/video/website] [Title] - [Brief summary] - [URL or Citation]
-2. ...`,
+2. ...`;
+
+            if (__DEV__) {
+              console.log("[GeminiService] analyzeProblem payload:", {
+                mode,
+                depth,
+                tone,
+                promptLength: basePrompt.length
+              });
+            }
+
+            const response = await this.api.post(
+              `/models/gemini-pro-vision:generateContent?key=${this.apiKey}`,
+              {
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: basePrompt,
                       },
                       {
                         inline_data: {
@@ -88,7 +174,7 @@ RESOURCES:
             );
           }
         },
-        { ttl: 30 * 60 * 1000 } // Cache for 30 minutes
+        { ttl: 30 * 60 * 1000 }
       );
     });
   }
@@ -198,19 +284,35 @@ RESOURCES:
 
   async chat(
     message: string,
-    conversationHistory: any[] = []
+    conversationHistory: any[] = [],
+    options?: ExplanationOptions
   ): Promise<GeminiResponse> {
     return PerformanceMonitor.measureAsync(
       "api_chat",
       async () => {
         try {
+          const modePrompt = options ? this.buildModePrompt(options) : "";
+          const enhancedMessage = modePrompt 
+            ? `${modePrompt}\n\nUser question: ${message}`
+            : message;
+
+          if (__DEV__) {
+            console.log("[GeminiService] chat payload:", {
+              mode: options?.mode || "standard",
+              depth: options?.depth || "normal",
+              tone: options?.tone || "formal",
+              originalMessageLength: message.length,
+              enhancedMessageLength: enhancedMessage.length
+            });
+          }
+
           const response = await this.api.post(
             `/models/gemini-pro:generateContent?key=${this.apiKey}`,
             {
               contents: [
                 ...conversationHistory,
                 {
-                  parts: [{ text: message }],
+                  parts: [{ text: enhancedMessage }],
                 },
               ],
             }

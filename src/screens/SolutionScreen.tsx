@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { ProblemAnalysis } from "../services/GeminiService";
@@ -14,13 +15,22 @@ import SessionService from "../services/SessionService";
 import UserService from "../services/UserService";
 import { ResourcePanel } from "../components/ResourcePanel";
 import ResourceService from "../services/ResourceService";
-import { Resource } from "../types";
+import { Resource, ExplanationMode } from "../types";
+import GeminiService from "../services/GeminiService";
+import CacheManager from "../utils/CacheManager";
 
 export const SolutionScreen: React.FC = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const solution = (route.params as any)?.solution as ProblemAnalysis;
+  const initialSolution = (route.params as any)?.solution as ProblemAnalysis;
+  const imageData = (route.params as any)?.imageData as string;
+  const [solution, setSolution] = useState<ProblemAnalysis>(initialSolution);
   const [resources, setResources] = useState<Resource[]>([]);
+  const [currentMode, setCurrentMode] = useState<ExplanationMode>("standard");
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [cachedSolutions, setCachedSolutions] = useState<Map<ExplanationMode, ProblemAnalysis>>(
+    new Map([["standard", initialSolution]])
+  );
 
   useEffect(() => {
     AnalyticsService.trackScreen("Solution", {
@@ -81,6 +91,84 @@ export const SolutionScreen: React.FC = () => {
     navigation.goBack();
   }, [navigation]);
 
+  const handleModeChange = useCallback(async (mode: ExplanationMode) => {
+    if (mode === currentMode || isRegenerating) {
+      return;
+    }
+
+    const previousMode = currentMode;
+    const startTime = Date.now();
+
+    if (cachedSolutions.has(mode)) {
+      const cachedSolution = cachedSolutions.get(mode)!;
+      setSolution(cachedSolution);
+      setCurrentMode(mode);
+      
+      AnalyticsService.trackExplanationModeSwitch(
+        "Solution",
+        previousMode,
+        mode,
+        true
+      );
+      AnalyticsService.trackExplanationModeUsage(mode, "Solution");
+      
+      if (cachedSolution?.resources && cachedSolution.resources.length > 0) {
+        const converted = cachedSolution.resources.map(r =>
+          ResourceService.convertToResource(r, undefined, cachedSolution.difficulty)
+        );
+        setResources(converted);
+      }
+      
+      return;
+    }
+
+    if (!imageData) {
+      console.warn("No image data available for regeneration");
+      return;
+    }
+
+    setIsRegenerating(true);
+    
+    try {
+      const newSolution = await GeminiService.analyzeProblem(imageData, { mode });
+      const generationTime = Date.now() - startTime;
+      
+      setSolution(newSolution);
+      setCurrentMode(mode);
+      setCachedSolutions(prev => new Map(prev).set(mode, newSolution));
+      
+      AnalyticsService.trackExplanationModeSwitch(
+        "Solution",
+        previousMode,
+        mode,
+        false
+      );
+      AnalyticsService.trackExplanationModeUsage(mode, "Solution");
+      AnalyticsService.trackExplanationGeneration(
+        mode,
+        "Solution",
+        false,
+        generationTime
+      );
+      
+      if (newSolution?.resources && newSolution.resources.length > 0) {
+        const converted = newSolution.resources.map(r =>
+          ResourceService.convertToResource(r, undefined, newSolution.difficulty)
+        );
+        setResources(converted);
+      }
+    } catch (error) {
+      console.error("Failed to regenerate solution:", error);
+      AnalyticsService.trackError(error as Error, { 
+        screen: "Solution",
+        action: "mode_switch",
+        mode
+      });
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [currentMode, cachedSolutions, imageData, isRegenerating]);
+
   const renderedSteps = useMemo(() => {
     if (!solution) {
       return null;
@@ -114,6 +202,77 @@ export const SolutionScreen: React.FC = () => {
               {solution.difficulty.toUpperCase()}
             </Text>
           </View>
+        </View>
+
+        <View style={styles.modeSelector}>
+          <Text style={styles.modeSelectorTitle}>Explanation Mode:</Text>
+          <View style={styles.modeButtons}>
+            <TouchableOpacity
+              style={[
+                styles.modeButton,
+                currentMode === "eli5" && styles.modeButtonActive,
+                isRegenerating && styles.modeButtonDisabled
+              ]}
+              onPress={() => handleModeChange("eli5")}
+              disabled={isRegenerating}
+              testID="mode-eli5"
+            >
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  currentMode === "eli5" && styles.modeButtonTextActive,
+                ]}
+              >
+                🎈 ELI5
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.modeButton,
+                currentMode === "standard" && styles.modeButtonActive,
+                isRegenerating && styles.modeButtonDisabled
+              ]}
+              onPress={() => handleModeChange("standard")}
+              disabled={isRegenerating}
+              testID="mode-standard"
+            >
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  currentMode === "standard" && styles.modeButtonTextActive,
+                ]}
+              >
+                📚 Standard
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.modeButton,
+                currentMode === "advanced" && styles.modeButtonActive,
+                isRegenerating && styles.modeButtonDisabled
+              ]}
+              onPress={() => handleModeChange("advanced")}
+              disabled={isRegenerating}
+              testID="mode-advanced"
+            >
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  currentMode === "advanced" && styles.modeButtonTextActive,
+                ]}
+              >
+                🔬 Advanced
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {isRegenerating && (
+            <View style={styles.regeneratingIndicator}>
+              <ActivityIndicator size="small" color="#007AFF" />
+              <Text style={styles.regeneratingText}>Generating {currentMode} explanation...</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.stepsContainer}>
@@ -208,6 +367,59 @@ const styles = StyleSheet.create({
   },
   difficulty_hard: {
     color: "#FF3B30",
+  },
+  modeSelector: {
+    padding: 16,
+    backgroundColor: "#fff",
+    marginTop: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modeSelectorTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 12,
+  },
+  modeButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#f0f0f0",
+    borderWidth: 2,
+    borderColor: "#f0f0f0",
+    alignItems: "center",
+  },
+  modeButtonActive: {
+    backgroundColor: "#e8f4fd",
+    borderColor: "#007AFF",
+  },
+  modeButtonDisabled: {
+    opacity: 0.5,
+  },
+  modeButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#666",
+  },
+  modeButtonTextActive: {
+    color: "#007AFF",
+  },
+  regeneratingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    gap: 8,
+  },
+  regeneratingText: {
+    fontSize: 13,
+    color: "#007AFF",
   },
   stepsContainer: {
     padding: 20,
